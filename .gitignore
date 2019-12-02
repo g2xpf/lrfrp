@@ -1,0 +1,5 @@
+# ignore all 'target' directories
+**/target/
+
+Cargo.lock
+**/*.rs.bk
