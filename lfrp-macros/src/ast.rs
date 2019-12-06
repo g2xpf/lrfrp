@@ -1,30 +1,26 @@
-use proc_macro2::Span;
+use syn::braced;
 use syn::parse::{Parse, ParseStream};
+use syn::punctuated::Punctuated;
+use syn::token::{Brace, Comma};
 use syn::{Ident, Result, Token};
+
+pub mod custom_keywords;
+pub mod custom_punctuations;
+pub mod path;
+pub mod types;
 
 #[derive(Debug)]
 pub struct Ast {
-    pub item_mod: ItemMod,
+    items: Vec<Item>,
 }
 
-impl Parse for Ast {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let mut item_mod = None;
-
-        while !input.is_empty() {
-            let lookahead = input.lookahead1();
-            if lookahead.peek(Token![mod]) {
-                item_mod = Some(input.parse()?);
-            } else {
-            }
-        }
-
-        if let (Some(item_mod)) = (item_mod) {
-            Ok(Ast { item_mod })
-        } else {
-            unimplemented!()
-        }
-    }
+#[derive(Debug)]
+pub enum Item {
+    Mod(ItemMod),
+    In(ItemIn),
+    Out(ItemOut),
+    Args(ItemArgs),
+    FrpStmt(ItemFrpStmt),
 }
 
 #[derive(Debug)]
@@ -34,12 +30,125 @@ pub struct ItemMod {
     pub semi_token: Token![;],
 }
 
-impl Parse for ItemMod {
+#[derive(Debug)]
+pub struct Field {
+    pub ident: Ident,
+    pub colon_token: Token![:],
+    pub ty: types::Type,
+}
+
+impl Parse for Field {
     fn parse(input: ParseStream) -> Result<Self> {
-        Ok(ItemMod {
-            mod_token: input.parse()?,
-            name: input.parse()?,
-            semi_token: input.parse()?,
+        Ok(Field {
+            ident: input.parse()?,
+            colon_token: input.parse()?,
+            ty: input.parse()?,
         })
+    }
+}
+
+#[derive(Debug)]
+pub struct ItemArgs {
+    pub args_token: custom_keywords::Args,
+    pub braced_token: Brace,
+    pub fields: Punctuated<Field, Comma>,
+}
+
+#[derive(Debug)]
+pub struct ItemOut {
+    pub out_token: custom_keywords::Out,
+    pub braced_token: Brace,
+    pub fields: Punctuated<Field, Comma>,
+}
+
+#[derive(Debug)]
+pub struct ItemIn {
+    pub in_token: custom_keywords::In,
+    pub braced_token: Brace,
+    pub fields: Punctuated<Field, Comma>,
+}
+
+macro_rules! impl_parse_for_key {
+    ($type:tt, $token_param:ident) => {
+        impl Parse for $type {
+            fn parse(input: ParseStream) -> Result<Self> {
+                let content;
+                let $token_param = input.parse()?;
+                let braced_token = braced!(content in input);
+                let fields = content.parse_terminated(Field::parse)?;
+
+                Ok(Self {
+                    $token_param,
+                    braced_token,
+                    fields,
+                })
+            }
+        }
+    }
+}
+
+impl_parse_for_key!(ItemIn, in_token);
+impl_parse_for_key!(ItemOut, out_token);
+impl_parse_for_key!(ItemArgs, args_token);
+
+#[derive(Debug)]
+pub enum ItemFrpStmt {
+    // Dependency(StmtDependency),
+// Arrow(StmtArrow),
+}
+
+#[derive(Debug)]
+pub struct StmtDependency {
+    // pat: Pat,
+// eq_token: Token![=],
+// expr: Expr,
+// semi_token: Token![;],
+}
+
+#[derive(Debug)]
+pub struct StmtArrow {
+    // pat: Pat,
+// left_arrow_token: Token![<-],
+// arrow_expr: ArrowExpr,
+// rev_arrow_token: custom_punctuations::RevArrow,
+// expr: Expr,
+// semi_token: Token![;],
+}
+
+impl Parse for Ast {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let mut items = vec![];
+        while !input.is_empty() {
+            let item = input.parse()?;
+            items.push(item);
+        }
+
+        Ok(Ast { items })
+    }
+}
+
+impl Parse for Item {
+    fn parse(input: ParseStream) -> Result<Self> {
+        use Item::*;
+
+        let lookahead = input.lookahead1();
+        if lookahead.peek(Token![mod]) {
+            Ok(Mod(ItemMod {
+                mod_token: input.parse()?,
+                name: input.parse()?,
+                semi_token: input.parse()?,
+            }))
+        } else if lookahead.peek(custom_keywords::In) {
+            Ok(input.parse().map(In)?)
+        } else if lookahead.peek(custom_keywords::Out) {
+            Ok(input.parse().map(Out)?)
+        } else if lookahead.peek(custom_keywords::Args) {
+            Ok(input.parse().map(Args)?)
+        } else if lookahead.peek(Ident) {
+            // Ok(FrpStmt(ItemFrpStmt {}))
+            unimplemented!()
+        } else {
+            Err(lookahead.error())
+        }
     }
 }
