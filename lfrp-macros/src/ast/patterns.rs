@@ -28,10 +28,10 @@ impl Parse for Pat {
             Ok(input.parse().map(Pat::Wild)?)
         // } else if lookahead.peek(Token![-]) || lookahead.peek(Lit) {
         } else if input.peek(Ident) && input.peek2(Brace) {
-            unimplemented!()
-        // Ok(input.parse().map(Struct)?)
+            unimplemented!("impl Parse for PatStruct")
+        // Ok(input.parse().map(Pat::Struct)?)
         } else if input.peek(Ident) && input.peek2(Paren) {
-            unimplemented!()
+            unimplemented!("impl Parse for PatTupleStruct")
         // Ok(input.parse().map(TupleStruct)?)
         } else if input.peek(Ident) {
             Ok(input.parse().map(Pat::Ident)?)

@@ -1,10 +1,10 @@
 use super::BinOp;
+use syn::parse::ParseStream;
+use syn::Token;
 
 #[derive(Copy, Clone, PartialEq, PartialOrd)]
 pub enum Precedence {
     Any,
-    Assign,
-    Range,
     Or,
     And,
     Compare,
@@ -19,7 +19,7 @@ pub enum Precedence {
 }
 
 impl Precedence {
-    fn of(op: &BinOp) -> Self {
+    pub fn of(op: &BinOp) -> Self {
         match *op {
             BinOp::Add(_) | BinOp::Sub(_) => Precedence::Arithmetic,
             BinOp::Mul(_) | BinOp::Div(_) | BinOp::Rem(_) => Precedence::Term,
@@ -36,6 +36,16 @@ impl Precedence {
             | BinOp::Ge(_)
             | BinOp::Gt(_) => Precedence::Compare,
             BinOp::Pow(_) => Precedence::Pow,
+        }
+    }
+
+    pub fn peek(input: ParseStream) -> Self {
+        if let Ok(op) = input.fork().parse() {
+            Precedence::of(&op)
+        } else if input.peek(Token![as]) || input.peek(Token![:]) && !input.peek(Token![::]) {
+            Precedence::Cast
+        } else {
+            Precedence::Any
         }
     }
 }

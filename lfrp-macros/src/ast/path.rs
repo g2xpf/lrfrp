@@ -12,6 +12,15 @@ pub struct Path {
     pub segment: PathSegment,
 }
 
+impl<T> From<T> for Path
+where
+    T: Into<PathSegment>,
+{
+    fn from(t: T) -> Self {
+        Path { segment: t.into() }
+    }
+}
+
 impl Parse for Path {
     fn parse(input: ParseStream) -> Result<Self> {
         Ok(Path {
@@ -24,6 +33,15 @@ impl Parse for Path {
 pub struct PathSegment {
     pub ident: Ident,
     pub arguments: PathArguments,
+}
+
+impl From<Ident> for PathSegment {
+    fn from(ident: Ident) -> Self {
+        PathSegment {
+            ident,
+            arguments: PathArguments::None,
+        }
+    }
 }
 
 impl Parse for PathSegment {

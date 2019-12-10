@@ -3,13 +3,16 @@ use super::custom_punctuations::StarStar;
 use super::literals::Lit;
 use super::path::Path;
 use super::patterns::Pat;
+use super::statements::AllowNoSemi;
 use super::statements::Stmt;
 use super::types::Type;
+
 use std::ops::Deref;
+
 use syn::parse::{Parse, ParseStream};
-use syn::Ident;
 use syn::Result;
-use syn::{braced, bracketed};
+use syn::{braced, bracketed, parenthesized};
+use syn::{Ident, Member};
 
 use syn::punctuated::Punctuated;
 use syn::token::{
@@ -17,7 +20,7 @@ use syn::token::{
     Shr, Star, Sub,
 };
 use syn::token::{Brace, Bracket, Colon, Dot2, Else, FatArrow, If, Match, Paren};
-use syn::{Member, Token};
+use syn::Token;
 
 mod precedence;
 use precedence::Precedence;
@@ -48,6 +51,7 @@ pub enum Expr {
     Tuple(ExprTuple),
     Path(ExprPath),
     List(ExprList),
+    Type(ExprType),
 }
 
 impl Parse for Expr {
@@ -80,7 +84,7 @@ fn atom_expr(input: ParseStream, allow_struct: AllowStruct) -> Result<Expr> {
 
         input.parse().map(Expr::Lit)
     } else if input.peek(Ident) {
-        path_or_struct(input)
+        path_or_struct(input, allow_struct)
     } else if input.peek(Paren) {
         paren_or_tuple(input)
     } else if input.peek(Bracket) {
@@ -88,7 +92,7 @@ fn atom_expr(input: ParseStream, allow_struct: AllowStruct) -> Result<Expr> {
     } else if input.peek(If) {
         input.parse().map(Expr::If)
     } else if input.peek(Match) {
-        unimplemented!()
+        unimplemented!("Match")
     } else if input.peek(Brace) {
         input.parse().map(Expr::Block)
     } else {
@@ -96,30 +100,171 @@ fn atom_expr(input: ParseStream, allow_struct: AllowStruct) -> Result<Expr> {
     }
 }
 
-fn path_or_struct(input: ParseStream) -> Result<Expr> {
-    unimplemented!()
+fn path_or_struct(input: ParseStream, allow_struct: AllowStruct) -> Result<Expr> {
+    let path: ExprPath = input.parse()?;
+    if *allow_struct && input.peek(Brace) {
+        let content;
+        let brace_token = braced!(content in input);
+        let mut fields = Punctuated::new();
+        loop {
+            if content.fork().parse::<Member>().is_err() {
+                break;
+            }
+            let field = content.parse()?;
+            fields.push_value(field);
+            if !content.peek(Token![,]) {
+                break;
+            }
+            let comma_token = content.parse()?;
+            fields.push_punct(comma_token);
+        }
+
+        let (dot2_token, rest) = if fields.empty_or_trailing() && content.peek(Token![..]) {
+            let dot2_token: Token![..] = content.parse()?;
+            let rest: Expr = content.parse()?;
+            (Some(dot2_token), Some(Box::new(rest)))
+        } else {
+            (None, None)
+        };
+
+        Ok(Expr::Struct(ExprStruct {
+            path: path.path,
+            brace_token,
+            fields,
+            dot2_token,
+            rest,
+        }))
+    } else {
+        Ok(Expr::Path(path))
+    }
 }
 
 fn paren_or_tuple(input: ParseStream) -> Result<Expr> {
-    unimplemented!()
+    let content;
+    let paren_token = parenthesized!(content in input);
+    if content.is_empty() {
+        return Ok(Expr::Tuple(ExprTuple {
+            paren_token,
+            elems: Punctuated::new(),
+        }));
+    }
+
+    let first: Expr = content.parse()?;
+    if content.is_empty() {
+        return Ok(Expr::Paren(ExprParen {
+            paren_token,
+            expr: Box::new(first),
+        }));
+    }
+
+    let mut elems = Punctuated::new();
+    elems.push_value(first);
+    while !content.is_empty() {
+        let punct = content.parse()?;
+        elems.push_punct(punct);
+        if content.is_empty() {
+            break;
+        }
+        let value = content.parse()?;
+        elems.push_value(value);
+    }
+    Ok(Expr::Tuple(ExprTuple { paren_token, elems }))
 }
 
 fn trailer_helper(input: ParseStream, mut e: Expr) -> Result<Expr> {
-    unimplemented!()
+    loop {
+        if input.peek(Paren) {
+            let content;
+            e = Expr::Call(ExprCall {
+                func: Box::new(e),
+                paren_token: parenthesized!(content in input),
+                args: content.parse_terminated(Expr::parse)?,
+            });
+        } else if input.peek(Token![.]) && input.peek(Token![..]) {
+            let dot_token = input.parse()?;
+            let member = input.parse()?;
+            e = Expr::Field(ExprField {
+                base: Box::new(e),
+                dot_token,
+                member,
+            });
+        } else if input.peek(Bracket) {
+            let content;
+            e = Expr::Index(ExprIndex {
+                expr: Box::new(e),
+                bracket_token: bracketed!(content in input),
+                index: content.parse()?,
+            });
+        } else {
+            break;
+        }
+    }
+    Ok(e)
 }
 
 fn parse_expr(
     input: ParseStream,
-    lhs: Expr,
+    mut lhs: Expr,
     allow_struct: AllowStruct,
     base: Precedence,
 ) -> Result<Expr> {
-    unimplemented!()
+    loop {
+        if input
+            .fork()
+            .parse::<BinOp>()
+            .ok()
+            .map_or(false, |op| Precedence::of(&op) >= base)
+        {
+            let op: BinOp = input.parse()?;
+            let precedence = Precedence::of(&op);
+            let mut rhs = unary_expr(input, allow_struct)?;
+            loop {
+                let next = Precedence::peek(input);
+                if precedence < next {
+                    rhs = parse_expr(input, rhs, allow_struct, next)?;
+                } else {
+                    break;
+                }
+            }
+            lhs = Expr::Binary(ExprBinary {
+                lhs: Box::new(lhs),
+                op,
+                rhs: Box::new(rhs),
+            });
+        } else if Precedence::Cast >= base && input.peek(Token![as]) {
+            let as_token: Token![as] = input.parse()?;
+            let ty = input.parse()?;
+            lhs = Expr::Cast(ExprCast {
+                expr: Box::new(lhs),
+                as_token,
+                ty: Box::new(ty),
+            });
+        } else if Precedence::Cast >= base && input.peek(Token![:]) && !input.peek(Token![::]) {
+            let colon_token: Token![:] = input.parse()?;
+            let ty = input.parse()?;
+            lhs = Expr::Type(ExprType {
+                expr: Box::new(lhs),
+                colon_token,
+                ty: Box::new(ty),
+            });
+        } else {
+            break;
+        }
+    }
+    Ok(lhs)
 }
 
 #[derive(Debug)]
 pub struct ExprPath {
     path: Path,
+}
+
+impl Parse for ExprPath {
+    fn parse(input: ParseStream) -> Result<Self> {
+        Ok(ExprPath {
+            path: input.parse()?,
+        })
+    }
 }
 
 #[derive(Debug)]
@@ -148,6 +293,31 @@ pub struct FieldValue {
     pub member: Member,
     pub colon_token: Option<Colon>,
     pub expr: Expr,
+}
+
+impl Parse for FieldValue {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let member: Member = input.parse()?;
+        let (colon_token, value) = match member {
+            Member::Unnamed(_) => {
+                let colon_token: Token![:] = input.parse()?;
+                let value: Expr = input.parse()?;
+                (Some(colon_token), value)
+            }
+            Member::Named(ref ident) => {
+                let value = Expr::Path(ExprPath {
+                    path: Path::from(ident.clone()),
+                });
+                (None, value)
+            }
+        };
+
+        Ok(FieldValue {
+            member,
+            colon_token,
+            expr: value,
+        })
+    }
 }
 
 #[derive(Debug)]
@@ -183,7 +353,7 @@ impl Parse for ExprLit {
 #[derive(Debug)]
 pub struct ExprIndex {
     expr: Box<Expr>,
-    braced_token: Bracket,
+    bracket_token: Bracket,
     index: Box<Expr>,
 }
 
@@ -214,7 +384,14 @@ impl Parse for ExprIf {
 pub struct ExprCast {
     expr: Box<Expr>,
     as_token: Token![as],
-    ty: Type,
+    ty: Box<Type>,
+}
+
+#[derive(Debug)]
+pub struct ExprType {
+    expr: Box<Expr>,
+    colon_token: Token![:],
+    ty: Box<Type>,
 }
 
 #[derive(Debug)]
@@ -239,7 +416,7 @@ impl Parse for ExprBlock {
                         break;
                     }
                     // No expressions require semicolon in order to be a statement
-                    let stmt = Stmt::parse_stmt(input, true)?;
+                    let stmt = Stmt::parse_stmt(input, AllowNoSemi(true))?;
                     stmts.push(stmt);
                     if input.is_empty() {
                         break;
@@ -343,4 +520,50 @@ pub enum BinOp {
     Ge(Ge),
     Gt(Gt),
     Pow(StarStar),
+}
+
+impl Parse for BinOp {
+    fn parse(input: ParseStream) -> Result<Self> {
+        if input.peek(StarStar) {
+            input.parse().map(BinOp::Pow)
+        } else if input.peek(Token![&&]) {
+            input.parse().map(BinOp::And)
+        } else if input.peek(Token![||]) {
+            input.parse().map(BinOp::Or)
+        } else if input.peek(Token![<<]) {
+            input.parse().map(BinOp::Shl)
+        } else if input.peek(Token![>>]) {
+            input.parse().map(BinOp::Shr)
+        } else if input.peek(Token![==]) {
+            input.parse().map(BinOp::Eq)
+        } else if input.peek(Token![<=]) {
+            input.parse().map(BinOp::Le)
+        } else if input.peek(Token![!=]) {
+            input.parse().map(BinOp::Ne)
+        } else if input.peek(Token![>=]) {
+            input.parse().map(BinOp::Ge)
+        } else if input.peek(Token![+]) {
+            input.parse().map(BinOp::Add)
+        } else if input.peek(Token![-]) {
+            input.parse().map(BinOp::Sub)
+        } else if input.peek(Token![*]) {
+            input.parse().map(BinOp::Mul)
+        } else if input.peek(Token![/]) {
+            input.parse().map(BinOp::Div)
+        } else if input.peek(Token![%]) {
+            input.parse().map(BinOp::Rem)
+        } else if input.peek(Token![^]) {
+            input.parse().map(BinOp::BitXor)
+        } else if input.peek(Token![&]) {
+            input.parse().map(BinOp::BitAnd)
+        } else if input.peek(Token![|]) {
+            input.parse().map(BinOp::BitOr)
+        } else if input.peek(Token![<]) {
+            input.parse().map(BinOp::Lt)
+        } else if input.peek(Token![>]) {
+            input.parse().map(BinOp::Gt)
+        } else {
+            Err(input.error("expected binary operator"))
+        }
+    }
 }
