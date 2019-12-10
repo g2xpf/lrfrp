@@ -1,7 +1,7 @@
 use syn::braced;
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
-use syn::token::{Brace, Comma};
+use syn::token::{Brace, Comma, Let};
 use syn::{Ident, Result, Token};
 
 pub mod custom_keywords;
@@ -97,26 +97,82 @@ impl_parse_for_key!(ItemArgs, args_token);
 
 #[derive(Debug)]
 pub enum ItemFrpStmt {
-    // Dependency(StmtDependency),
-// Arrow(StmtArrow),
+    Dependency(FrpStmtDependency),
+    Arrow(FrpStmtArrow),
+}
+
+impl Parse for ItemFrpStmt {
+    fn parse(input: ParseStream) -> Result<Self> {
+        use ItemFrpStmt::*;
+
+        let let_token = input.parse()?;
+        let pat = input.parse()?;
+        let lookahead = input.lookahead1();
+        if lookahead.peek(Token![=]) {
+            let eq_token = input.parse()?;
+            let expr = input.parse()?;
+            let semi_token = input.parse()?;
+            Ok(Dependency(FrpStmtDependency {
+                let_token,
+                pat,
+                eq_token,
+                expr,
+                semi_token,
+            }))
+        } else if lookahead.peek(Token![<-]) {
+            let left_arrow_token = input.parse()?;
+            let arrow_expr = input.parse()?;
+            let rev_arrow_token = input.parse()?;
+            let expr = input.parse()?;
+            let semi_token = input.parse()?;
+            Ok(Arrow(FrpStmtArrow {
+                let_token,
+                pat,
+                left_arrow_token,
+                arrow_expr,
+                rev_arrow_token,
+                expr,
+                semi_token,
+            }))
+        } else {
+            Err(lookahead.error())
+        }
+    }
 }
 
 #[derive(Debug)]
-pub struct StmtDependency {
-    // pat: Pat,
-// eq_token: Token![=],
-// expr: Expr,
-// semi_token: Token![;],
+pub struct FrpStmtDependency {
+    let_token: Let,
+    pat: patterns::Pat,
+    eq_token: Token![=],
+    expr: expressions::Expr,
+    semi_token: Token![;],
 }
 
 #[derive(Debug)]
-pub struct StmtArrow {
-    // pat: Pat,
-// left_arrow_token: Token![<-],
-// arrow_expr: ArrowExpr,
-// rev_arrow_token: custom_punctuations::RevArrow,
-// expr: Expr,
-// semi_token: Token![;],
+pub struct FrpStmtArrow {
+    let_token: Let,
+    pat: patterns::Pat,
+    left_arrow_token: Token![<-],
+    arrow_expr: ArrowExpr,
+    rev_arrow_token: custom_punctuations::RevArrow,
+    expr: expressions::Expr,
+    semi_token: Token![;],
+}
+
+#[derive(Debug)]
+pub struct ArrowExpr {
+    delay_token: custom_keywords::delay,
+    ident: Ident,
+}
+
+impl Parse for ArrowExpr {
+    fn parse(input: ParseStream) -> Result<Self> {
+        Ok(ArrowExpr {
+            delay_token: input.parse()?,
+            ident: input.parse()?,
+        })
+    }
 }
 
 impl Parse for Ast {
@@ -148,9 +204,8 @@ impl Parse for Item {
             Ok(input.parse().map(Out)?)
         } else if lookahead.peek(custom_keywords::Args) {
             Ok(input.parse().map(Args)?)
-        } else if lookahead.peek(Ident) {
-            // Ok(FrpStmt(ItemFrpStmt {}))
-            unimplemented!()
+        } else if lookahead.peek(Let) {
+            Ok(input.parse().map(FrpStmt)?)
         } else {
             Err(lookahead.error())
         }

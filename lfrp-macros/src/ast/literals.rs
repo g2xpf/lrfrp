@@ -10,6 +10,19 @@ pub enum Lit {
     Bool(LitBool),
 }
 
+impl Lit {
+    pub fn peeked(input: &ParseStream) -> bool {
+        input.peek(LitInt) || input.peek(LitFloat) || {
+            let cursor = input.cursor();
+            if let Some((ident, _)) = cursor.ident() {
+                ident == "True" || ident == "False"
+            } else {
+                false
+            }
+        }
+    }
+}
+
 impl Parse for Lit {
     fn parse(input: ParseStream) -> Result<Self> {
         // literal suffixes will be filtered
