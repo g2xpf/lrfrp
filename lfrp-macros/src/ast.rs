@@ -4,6 +4,10 @@ use syn::punctuated::Punctuated;
 use syn::token::{Brace, Comma, Let};
 use syn::{Ident, Result, Token};
 
+use quote::{quote, ToTokens};
+
+use proc_macro2::TokenStream;
+
 pub mod custom_keywords;
 pub mod custom_punctuations;
 pub mod expressions;
@@ -51,6 +55,14 @@ impl Parse for Field {
     }
 }
 
+impl ToTokens for Field {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.ident.to_tokens(tokens);
+        self.colon_token.to_tokens(tokens);
+        self.ty.to_tokens(tokens);
+    }
+}
+
 #[derive(Debug)]
 pub struct ItemArgs {
     pub args_token: custom_keywords::Args,
@@ -94,6 +106,27 @@ macro_rules! impl_parse_for_key {
 impl_parse_for_key!(ItemIn, in_token);
 impl_parse_for_key!(ItemOut, out_token);
 impl_parse_for_key!(ItemArgs, args_token);
+
+macro_rules! impl_to_tokens_for_key {
+    ($type:tt, $token_param:ident) => {
+        impl ToTokens for $type {
+            fn to_tokens(&self, tokens: &mut TokenStream) {
+                let fields = &self.fields;
+                let token_param = &self.$token_param;
+                let token_stream = quote! {
+                    struct #token_param {
+                        #fields
+                    }
+                };
+                tokens.extend(token_stream);
+            }
+        }
+    };
+}
+
+impl_to_tokens_for_key!(ItemIn, in_token);
+impl_to_tokens_for_key!(ItemOut, out_token);
+impl_to_tokens_for_key!(ItemArgs, args_token);
 
 #[derive(Debug)]
 pub enum ItemFrpStmt {

@@ -45,6 +45,7 @@ pub enum Expr {
     If(ExprIf),
     Index(ExprIndex),
     Lit(ExprLit),
+    #[allow(dead_code)]
     Match(ExprMatch),
     Paren(ExprParen),
     Struct(ExprStruct),
@@ -409,14 +410,14 @@ impl Parse for ExprBlock {
                 let mut stmts = Vec::new();
 
                 loop {
-                    while input.peek(Token![;]) {
-                        input.parse::<Token![;]>()?;
+                    while content.peek(Token![;]) {
+                        content.parse::<Token![;]>()?;
                     }
-                    if input.is_empty() {
+                    if content.is_empty() {
                         break;
                     }
                     // No expressions require semicolon in order to be a statement
-                    let stmt = Stmt::parse_stmt(input, AllowNoSemi(true))?;
+                    let stmt = Stmt::parse_stmt(&content, AllowNoSemi(true))?;
                     stmts.push(stmt);
                     if input.is_empty() {
                         break;
@@ -487,7 +488,7 @@ impl Parse for ExprList {
         let content;
         Ok(ExprList {
             bracket_token: bracketed!(content in input),
-            elems: Punctuated::<Expr, Token![,]>::parse_terminated(input)?,
+            elems: Punctuated::<Expr, Token![,]>::parse_terminated(&content)?,
         })
     }
 }

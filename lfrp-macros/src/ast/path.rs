@@ -5,6 +5,10 @@ use syn::Ident;
 use syn::Result;
 use syn::Token;
 
+use quote::ToTokens;
+
+use proc_macro2::TokenStream;
+
 use super::types;
 
 #[derive(Debug)]
@@ -26,6 +30,12 @@ impl Parse for Path {
         Ok(Path {
             segment: input.parse()?,
         })
+    }
+}
+
+impl ToTokens for Path {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.segment.to_tokens(tokens);
     }
 }
 
@@ -63,11 +73,17 @@ impl Parse for PathSegment {
     }
 }
 
+impl ToTokens for PathSegment {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.ident.to_tokens(tokens);
+        self.arguments.to_tokens(tokens);
+    }
+}
+
 #[derive(Debug)]
 pub enum PathArguments {
     None,
     AngleBracketed(AngleBracketedGenericArguments),
-    // Parenthesized(ParenthesizedGenericArguments),
 }
 
 #[derive(Debug)]
@@ -105,6 +121,25 @@ impl Parse for AngleBracketedGenericArguments {
                 gt_token,
             }
         })
+    }
+}
+
+impl ToTokens for AngleBracketedGenericArguments {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.lt_token.to_tokens(tokens);
+        self.args.to_tokens(tokens);
+        self.gt_token.to_tokens(tokens);
+    }
+}
+
+impl ToTokens for PathArguments {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        use PathArguments::*;
+
+        match self {
+            None => {}
+            AngleBracketed(args) => args.to_tokens(tokens),
+        }
     }
 }
 

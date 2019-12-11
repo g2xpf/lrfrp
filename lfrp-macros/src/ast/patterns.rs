@@ -9,6 +9,7 @@ use syn::Token;
 use super::literals::Lit;
 use super::path::Path;
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum Pat {
     Wild(PatWild),

@@ -1,6 +1,5 @@
 use super::expressions::Expr;
 use super::patterns::Pat;
-use super::types::Type;
 
 use std::ops::Deref;
 
@@ -18,6 +17,7 @@ impl Deref for AllowNoSemi {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum Stmt {
     Local(StmtLocal),
@@ -26,7 +26,7 @@ pub enum Stmt {
 }
 
 impl Stmt {
-    pub fn parse_stmt(input: ParseStream, allow_nosemi: AllowNoSemi) -> Result<Self> {
+    pub fn parse_stmt(_input: ParseStream, _allow_nosemi: AllowNoSemi) -> Result<Self> {
         unimplemented!("parse_stmt(input: ParseStream, allow_nosemi: AllowNoSemi)")
     }
 }

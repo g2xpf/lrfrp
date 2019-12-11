@@ -6,10 +6,24 @@ use syn::token::{Bracket, Paren, Underscore};
 use syn::{bracketed, parenthesized};
 use syn::{Ident, Result, Token};
 
+use quote::{quote, ToTokens};
+
+use proc_macro2::TokenStream;
+
 #[derive(Debug)]
 pub struct TypeParen {
     paren_token: Paren,
     ty: Box<Type>,
+}
+
+impl ToTokens for TypeParen {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let ty = &self.ty;
+        let type_paren = quote! {
+            (#ty)
+        };
+        tokens.extend(type_paren);
+    }
 }
 
 #[derive(Debug)]
@@ -18,15 +32,45 @@ pub struct TypeList {
     ty: Box<Type>,
 }
 
+impl ToTokens for TypeList {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let ty = &self.ty;
+        let type_list = quote! {
+            [#ty]
+        };
+        tokens.extend(type_list);
+    }
+}
+
 #[derive(Debug)]
 pub struct TypeTuple {
     paren_token: Paren,
     elems: Punctuated<Type, Token![,]>,
 }
 
+impl ToTokens for TypeTuple {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let elems = &self.elems;
+        let type_tuple = quote! {
+            (#elems)
+        };
+        tokens.extend(type_tuple);
+    }
+}
+
 #[derive(Debug)]
 pub struct TypeInfer {
     underscore_token: Underscore,
+}
+
+impl ToTokens for TypeInfer {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let underscore_token = &self.underscore_token;
+        let type_infer = quote! {
+            #underscore_token
+        };
+        tokens.extend(type_infer);
+    }
 }
 
 #[derive(Debug)]
@@ -39,6 +83,12 @@ impl Parse for TypePath {
         Ok(TypePath {
             path: input.parse()?,
         })
+    }
+}
+
+impl ToTokens for TypePath {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.path.to_tokens(tokens)
     }
 }
 
@@ -94,6 +144,20 @@ impl Parse for Type {
             }))
         } else {
             Err(lookahead.error())
+        }
+    }
+}
+
+impl ToTokens for Type {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        use Type::*;
+
+        match self {
+            List(t) => t.to_tokens(tokens),
+            Tuple(t) => t.to_tokens(tokens),
+            Paren(t) => t.to_tokens(tokens),
+            Infer(t) => t.to_tokens(tokens),
+            Path(t) => t.to_tokens(tokens),
         }
     }
 }
