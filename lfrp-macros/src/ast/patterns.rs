@@ -34,6 +34,9 @@ impl Parse for Pat {
         } else if input.peek(Ident) && input.peek2(Paren) {
             unimplemented!("impl Parse for PatTupleStruct")
         // Ok(input.parse().map(TupleStruct)?)
+        } else if input.peek(Paren) {
+            unimplemented!("impl Parse for PatParen")
+        // Ok(input.parse().map(PatStruct)?)
         } else if input.peek(Ident) {
             Ok(input.parse().map(Pat::Ident)?)
         } else {
