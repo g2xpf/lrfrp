@@ -19,7 +19,7 @@ pub mod types;
 
 #[derive(Debug)]
 pub struct Ast {
-    items: Vec<Item>,
+    pub items: Vec<Item>,
 }
 
 #[derive(Debug)]
@@ -31,11 +31,33 @@ pub enum Item {
     FrpStmt(ItemFrpStmt),
 }
 
+impl ToTokens for Item {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        use Item::*;
+
+        match self {
+            Mod(ref e) => e.to_tokens(tokens),
+            In(ref e) => e.to_tokens(tokens),
+            Out(ref e) => e.to_tokens(tokens),
+            Args(ref e) => e.to_tokens(tokens),
+            FrpStmt(ref e) => e.to_tokens(tokens),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct ItemMod {
     pub mod_token: Token![mod],
     pub name: Ident,
     pub semi_token: Token![;],
+}
+
+impl ToTokens for ItemMod {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.mod_token.to_tokens(tokens);
+        self.name.to_tokens(tokens);
+        self.semi_token.to_tokens(tokens);
+    }
 }
 
 #[derive(Debug)]
@@ -45,6 +67,14 @@ pub struct Field {
     pub ty: types::Type,
 }
 
+impl ToTokens for Field {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.ident.to_tokens(tokens);
+        self.colon_token.to_tokens(tokens);
+        self.ty.to_tokens(tokens);
+    }
+}
+
 impl Parse for Field {
     fn parse(input: ParseStream) -> Result<Self> {
         Ok(Field {
@@ -52,14 +82,6 @@ impl Parse for Field {
             colon_token: input.parse()?,
             ty: input.parse()?,
         })
-    }
-}
-
-impl ToTokens for Field {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        self.ident.to_tokens(tokens);
-        self.colon_token.to_tokens(tokens);
-        self.ty.to_tokens(tokens);
     }
 }
 
@@ -111,14 +133,10 @@ macro_rules! impl_to_tokens_for_key {
     ($type:tt, $token_param:ident) => {
         impl ToTokens for $type {
             fn to_tokens(&self, tokens: &mut TokenStream) {
-                let fields = &self.fields;
-                let token_param = &self.$token_param;
-                let token_stream = quote! {
-                    struct #token_param {
-                        #fields
-                    }
-                };
-                tokens.extend(token_stream);
+                self.$token_param.to_tokens(tokens);
+                self.braced_token.surround(tokens, |tokens| {
+                    self.fields.to_tokens(tokens);
+                });
             }
         }
     };
@@ -132,6 +150,17 @@ impl_to_tokens_for_key!(ItemArgs, args_token);
 pub enum ItemFrpStmt {
     Dependency(FrpStmtDependency),
     Arrow(FrpStmtArrow),
+}
+
+impl ToTokens for ItemFrpStmt {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        use ItemFrpStmt::*;
+
+        match self {
+            Dependency(ref e) => e.to_tokens(tokens),
+            Arrow(ref e) => e.to_tokens(tokens),
+        }
+    }
 }
 
 impl Parse for ItemFrpStmt {
@@ -182,6 +211,12 @@ pub struct FrpStmtDependency {
     semi_token: Token![;],
 }
 
+impl ToTokens for FrpStmtDependency {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        unimplemented!()
+    }
+}
+
 #[derive(Debug)]
 pub struct FrpStmtArrow {
     let_token: Let,
@@ -191,6 +226,12 @@ pub struct FrpStmtArrow {
     rev_arrow_token: custom_punctuations::RevArrow,
     expr: expressions::Expr,
     semi_token: Token![;],
+}
+
+impl ToTokens for FrpStmtArrow {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        unimplemented!()
+    }
 }
 
 #[derive(Debug)]
