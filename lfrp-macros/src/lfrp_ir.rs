@@ -4,6 +4,7 @@ use syn::Result;
 #[macro_use]
 mod error;
 mod deps_check;
+mod types;
 
 use deps_check::deps_check;
 

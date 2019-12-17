@@ -3,10 +3,6 @@ use crate::ast::{
 };
 use syn::Result;
 
-struct Env {}
-
-struct DepsChecker {}
-
 pub fn deps_check(
     module: &ItemMod,
     input: &ItemIn,
