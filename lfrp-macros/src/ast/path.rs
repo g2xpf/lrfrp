@@ -11,9 +11,15 @@ use proc_macro2::TokenStream;
 
 use super::types;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Path {
     pub segment: PathSegment,
+}
+
+impl Path {
+    pub fn get_ident(&self) -> &Ident {
+        self.segment.get_ident()
+    }
 }
 
 impl<T> From<T> for Path
@@ -39,10 +45,16 @@ impl ToTokens for Path {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct PathSegment {
     pub ident: Ident,
     pub arguments: PathArguments,
+}
+
+impl PathSegment {
+    pub fn get_ident(&self) -> &Ident {
+        &self.ident
+    }
 }
 
 impl From<Ident> for PathSegment {
@@ -80,13 +92,13 @@ impl ToTokens for PathSegment {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum PathArguments {
     None,
     AngleBracketed(AngleBracketedGenericArguments),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct AngleBracketedGenericArguments {
     pub lt_token: Token![<],
     pub args: Punctuated<types::Type, Token![,]>,
@@ -143,13 +155,13 @@ impl ToTokens for PathArguments {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ParenthesizedGenericArguments {
     pub paren_token: Paren,
     pub args: Punctuated<types::Type, Token![,]>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum GenericArgument {
     Type(types::Type),
     // Const(Expr),

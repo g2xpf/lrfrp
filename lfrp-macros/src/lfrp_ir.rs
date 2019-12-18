@@ -4,7 +4,8 @@ use syn::Result;
 #[macro_use]
 mod error;
 mod deps_check;
-mod types;
+mod deps_trailer;
+pub mod types;
 
 use deps_check::deps_check;
 
@@ -24,22 +25,17 @@ impl LfrpIR {
         let mut output = None;
         let mut args = None;
 
-        let mut deps = vec![];
-        let mut arrows = vec![];
+        let mut frp_stmts = vec![];
 
         for item in ast.items.into_iter() {
             use Item::*;
-            use ItemFrpStmt::*;
 
             match item {
                 Mod(e) => try_write!(e => module),
                 In(e) => try_write!(e => input),
                 Out(e) => try_write!(e => output),
                 Args(e) => try_write!(e => args),
-                FrpStmt(e) => match e {
-                    Dependency(e) => deps.push(e),
-                    Arrow(e) => arrows.push(e),
-                },
+                FrpStmt(e) => frp_stmts.push(e),
             }
         }
 
@@ -47,7 +43,7 @@ impl LfrpIR {
         item_unwrap!(input, "In");
         item_unwrap!(output, "Out");
 
-        let body = deps_check(&module, &input, &output, &args, deps, arrows)?;
+        let body = deps_check(&module, &input, &output, &args, frp_stmts)?;
 
         Ok(LfrpIR {
             module,

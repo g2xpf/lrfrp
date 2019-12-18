@@ -10,89 +10,7 @@ use quote::{quote, ToTokens};
 
 use proc_macro2::TokenStream;
 
-#[derive(Debug)]
-pub struct TypeParen {
-    paren_token: Paren,
-    ty: Box<Type>,
-}
-
-impl ToTokens for TypeParen {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        let ty = &self.ty;
-        let type_paren = quote! {
-            (#ty)
-        };
-        tokens.extend(type_paren);
-    }
-}
-
-#[derive(Debug)]
-pub struct TypeList {
-    bracket_token: Bracket,
-    ty: Box<Type>,
-}
-
-impl ToTokens for TypeList {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        let ty = &self.ty;
-        let type_list = quote! {
-            [#ty]
-        };
-        tokens.extend(type_list);
-    }
-}
-
-#[derive(Debug)]
-pub struct TypeTuple {
-    paren_token: Paren,
-    elems: Punctuated<Type, Token![,]>,
-}
-
-impl ToTokens for TypeTuple {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        let elems = &self.elems;
-        let type_tuple = quote! {
-            (#elems)
-        };
-        tokens.extend(type_tuple);
-    }
-}
-
-#[derive(Debug)]
-pub struct TypeInfer {
-    underscore_token: Underscore,
-}
-
-impl ToTokens for TypeInfer {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        let underscore_token = &self.underscore_token;
-        let type_infer = quote! {
-            #underscore_token
-        };
-        tokens.extend(type_infer);
-    }
-}
-
-#[derive(Debug)]
-pub struct TypePath {
-    path: path::Path,
-}
-
-impl Parse for TypePath {
-    fn parse(input: ParseStream) -> Result<Self> {
-        Ok(TypePath {
-            path: input.parse()?,
-        })
-    }
-}
-
-impl ToTokens for TypePath {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        self.path.to_tokens(tokens)
-    }
-}
-
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Type {
     List(TypeList),
     Tuple(TypeTuple),
@@ -159,5 +77,87 @@ impl ToTokens for Type {
             Infer(t) => t.to_tokens(tokens),
             Path(t) => t.to_tokens(tokens),
         }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct TypeParen {
+    paren_token: Paren,
+    ty: Box<Type>,
+}
+
+impl ToTokens for TypeParen {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let ty = &self.ty;
+        let type_paren = quote! {
+            (#ty)
+        };
+        tokens.extend(type_paren);
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct TypeList {
+    bracket_token: Bracket,
+    ty: Box<Type>,
+}
+
+impl ToTokens for TypeList {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let ty = &self.ty;
+        let type_list = quote! {
+            [#ty]
+        };
+        tokens.extend(type_list);
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct TypeTuple {
+    paren_token: Paren,
+    elems: Punctuated<Type, Token![,]>,
+}
+
+impl ToTokens for TypeTuple {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let elems = &self.elems;
+        let type_tuple = quote! {
+            (#elems)
+        };
+        tokens.extend(type_tuple);
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct TypeInfer {
+    underscore_token: Underscore,
+}
+
+impl ToTokens for TypeInfer {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let underscore_token = &self.underscore_token;
+        let type_infer = quote! {
+            #underscore_token
+        };
+        tokens.extend(type_infer);
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct TypePath {
+    path: path::Path,
+}
+
+impl Parse for TypePath {
+    fn parse(input: ParseStream) -> Result<Self> {
+        Ok(TypePath {
+            path: input.parse()?,
+        })
+    }
+}
+
+impl ToTokens for TypePath {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.path.to_tokens(tokens)
     }
 }

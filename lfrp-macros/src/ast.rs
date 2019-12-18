@@ -181,7 +181,9 @@ impl Parse for ItemFrpStmt {
                 expr,
                 semi_token,
             }))
-        } else if lookahead.peek(Token![<-]) {
+        } else if lookahead.peek(Token![:]) {
+            let colon_token = input.parse()?;
+            let ty = input.parse()?;
             let left_arrow_token = input.parse()?;
             let arrow_expr = input.parse()?;
             let rev_arrow_token = input.parse()?;
@@ -190,6 +192,8 @@ impl Parse for ItemFrpStmt {
             Ok(Arrow(FrpStmtArrow {
                 let_token,
                 pat,
+                colon_token,
+                ty,
                 left_arrow_token,
                 arrow_expr,
                 rev_arrow_token,
@@ -204,11 +208,11 @@ impl Parse for ItemFrpStmt {
 
 #[derive(Debug)]
 pub struct FrpStmtDependency {
-    let_token: Let,
-    pat: patterns::Pat,
-    eq_token: Token![=],
-    expr: expressions::Expr,
-    semi_token: Token![;],
+    pub let_token: Let,
+    pub pat: patterns::Pat,
+    pub eq_token: Token![=],
+    pub expr: expressions::Expr,
+    pub semi_token: Token![;],
 }
 
 impl ToTokens for FrpStmtDependency {
@@ -219,33 +223,20 @@ impl ToTokens for FrpStmtDependency {
 
 #[derive(Debug)]
 pub struct FrpStmtArrow {
-    let_token: Let,
-    pat: patterns::Pat,
-    left_arrow_token: Token![<-],
-    arrow_expr: ArrowExpr,
-    rev_arrow_token: custom_punctuations::RevArrow,
-    expr: expressions::Expr,
-    semi_token: Token![;],
+    pub let_token: Let,
+    pub pat: patterns::Pat,
+    pub colon_token: Token![:],
+    pub ty: types::Type,
+    pub left_arrow_token: Token![<-],
+    pub arrow_expr: expressions::ArrowExpr,
+    pub rev_arrow_token: custom_punctuations::RevArrow,
+    pub expr: expressions::Expr,
+    pub semi_token: Token![;],
 }
 
 impl ToTokens for FrpStmtArrow {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         unimplemented!()
-    }
-}
-
-#[derive(Debug)]
-pub struct ArrowExpr {
-    delay_token: custom_keywords::delay,
-    ident: Ident,
-}
-
-impl Parse for ArrowExpr {
-    fn parse(input: ParseStream) -> Result<Self> {
-        Ok(ArrowExpr {
-            delay_token: input.parse()?,
-            ident: input.parse()?,
-        })
     }
 }
 

@@ -8,6 +8,7 @@ use syn::Token;
 
 use super::literals::Lit;
 use super::path::Path;
+use super::types::Type;
 
 #[allow(dead_code)]
 #[derive(Debug)]

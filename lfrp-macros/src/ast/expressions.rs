@@ -1,5 +1,5 @@
-use super::custom_keywords::then;
-use super::custom_punctuations::StarStar;
+use super::custom_keywords::{delay, then};
+use super::custom_punctuations::{RevArrow, StarStar};
 use super::literals::Lit;
 use super::path::Path;
 use super::patterns::Pat;
@@ -8,6 +8,8 @@ use super::statements::Stmt;
 use super::types::Type;
 
 use std::ops::Deref;
+
+use crate::lfrp_ir::types;
 
 use syn::parse::{Parse, ParseStream};
 use syn::Result;
@@ -24,6 +26,21 @@ use syn::Token;
 
 mod precedence;
 use precedence::Precedence;
+
+#[derive(Debug)]
+pub struct ArrowExpr {
+    delay_token: delay,
+    expr: Box<Expr>,
+}
+
+impl Parse for ArrowExpr {
+    fn parse(input: ParseStream) -> Result<Self> {
+        Ok(ArrowExpr {
+            delay_token: input.parse()?,
+            expr: Box::new(input.parse()?),
+        })
+    }
+}
 
 #[derive(Copy, Clone)]
 struct AllowStruct(bool);
@@ -53,6 +70,9 @@ pub enum Expr {
     Path(ExprPath),
     List(ExprList),
     Type(ExprType),
+
+    // types for deps checker
+    TypedExpr(Box<Expr>, types::Type),
 }
 
 impl Parse for Expr {
@@ -258,6 +278,12 @@ fn parse_expr(
 #[derive(Debug)]
 pub struct ExprPath {
     path: Path,
+}
+
+impl ExprPath {
+    pub fn get_ident(&self) -> &Ident {
+        self.path.get_ident()
+    }
 }
 
 impl Parse for ExprPath {
@@ -545,7 +571,8 @@ impl Parse for BinOp {
             input.parse().map(BinOp::Ge)
         } else if input.peek(Token![+]) {
             input.parse().map(BinOp::Add)
-        } else if input.peek(Token![-]) {
+        // prevent from matching `-<` token
+        } else if input.peek(Token![-]) && !input.peek2(Token![<]) {
             input.parse().map(BinOp::Sub)
         } else if input.peek(Token![*]) {
             input.parse().map(BinOp::Mul)

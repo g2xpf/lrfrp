@@ -1,4 +1,5 @@
 use super::types::Var;
+use syn::Ident;
 
 macro_rules! try_write {
     ($value:expr => $target:ident) => {{
@@ -26,23 +27,35 @@ macro_rules! item_unwrap {
 }
 
 #[derive(Debug)]
-pub struct UndefinedVariableError(Var);
+pub struct UndefinedVariableError<'a>(&'a Ident);
 
-impl UndefinedVariableError {
-    pub fn new(var: Var) -> Self {
-        UndefinedVariableError(var)
-    }
-
-    pub fn generate(var: Var) -> syn::Error {
-        UndefinedVariableError::new(var).into()
+impl<'a> UndefinedVariableError<'a> {
+    pub fn new(ident: &'a Ident) -> Self {
+        UndefinedVariableError(ident)
     }
 }
 
-impl Into<syn::Error> for UndefinedVariableError {
+impl<'a> Into<syn::Error> for UndefinedVariableError<'a> {
     fn into(self) -> syn::Error {
-        let token = self.0;
-        let ident = token.to_string();
-        let message = format!("Undefined variable `{}`", ident);
+        let token = &self.0;
+        let message = format!("Undefined variable `{}`", token.to_string());
+        syn::Error::new_spanned(token, message)
+    }
+}
+
+#[derive(Debug)]
+pub struct MultipleDefinitionError<'a>(&'a Ident);
+
+impl<'a> MultipleDefinitionError<'a> {
+    pub fn new(ident: &'a Ident) -> Self {
+        MultipleDefinitionError(ident)
+    }
+}
+
+impl<'a> Into<syn::Error> for MultipleDefinitionError<'a> {
+    fn into(self) -> syn::Error {
+        let token = &self.0;
+        let message = format!("Multiple definition `{}`", token.to_string());
         syn::Error::new_spanned(token, message)
     }
 }
