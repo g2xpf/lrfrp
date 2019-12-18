@@ -9,8 +9,8 @@ frp! {
     }
 
     In {
-        tmp: f32,
-        hmd: f32
+        tmp: Float,
+        hmd: Float
     }
 
     Out {

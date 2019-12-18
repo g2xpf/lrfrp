@@ -1,4 +1,4 @@
-use super::types::Var;
+use super::types::{TypeLifted, Var};
 use syn::Ident;
 
 macro_rules! try_write {
@@ -56,6 +56,48 @@ impl<'a> Into<syn::Error> for MultipleDefinitionError<'a> {
     fn into(self) -> syn::Error {
         let token = &self.0;
         let message = format!("Multiple definition `{}`", token.to_string());
+        syn::Error::new_spanned(token, message)
+    }
+}
+
+#[derive(Debug)]
+pub struct NotCalculatedError<'a>(&'a Ident);
+
+impl<'a> NotCalculatedError<'a> {
+    pub fn new(ident: &'a Ident) -> Self {
+        NotCalculatedError(ident)
+    }
+}
+
+impl<'a> Into<syn::Error> for NotCalculatedError<'a> {
+    fn into(self) -> syn::Error {
+        let token = &self.0;
+        let message = format!(
+            "Output variable `{}` won't be calculated",
+            token.to_string()
+        );
+        syn::Error::new_spanned(token, message)
+    }
+}
+
+#[derive(Debug)]
+pub struct LiftedTypeNotAllowedError<'a>(&'a Ident, &'a TypeLifted);
+
+impl<'a> LiftedTypeNotAllowedError<'a> {
+    pub fn new(ident: &'a Ident, type_lifted: &'a TypeLifted) -> Self {
+        LiftedTypeNotAllowedError(ident, type_lifted)
+    }
+}
+
+impl<'a> Into<syn::Error> for LiftedTypeNotAllowedError<'a> {
+    fn into(self) -> syn::Error {
+        let token = &self.0;
+        let ty = &self.1;
+        let message = format!(
+            "Variable `{}` has the lifted type `{}`",
+            token.to_string(),
+            ty.to_string()
+        );
         syn::Error::new_spanned(token, message)
     }
 }

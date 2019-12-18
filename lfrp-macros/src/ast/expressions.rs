@@ -7,6 +7,7 @@ use super::statements::AllowNoSemi;
 use super::statements::Stmt;
 use super::types::Type;
 
+use std::borrow::Borrow;
 use std::ops::Deref;
 
 use crate::lfrp_ir::types;
@@ -29,8 +30,8 @@ use precedence::Precedence;
 
 #[derive(Debug)]
 pub struct ArrowExpr {
-    delay_token: delay,
-    expr: Box<Expr>,
+    pub delay_token: delay,
+    pub expr: Box<Expr>,
 }
 
 impl Parse for ArrowExpr {
@@ -277,12 +278,12 @@ fn parse_expr(
 
 #[derive(Debug)]
 pub struct ExprPath {
-    path: Path,
+    pub path: Path,
 }
 
-impl ExprPath {
-    pub fn get_ident(&self) -> &Ident {
-        self.path.get_ident()
+impl Borrow<Ident> for ExprPath {
+    fn borrow(&self) -> &Ident {
+        self.path.borrow()
     }
 }
 
@@ -366,7 +367,7 @@ pub struct Arm {
 
 #[derive(Debug)]
 pub struct ExprLit {
-    lit: Lit,
+    pub lit: Lit,
 }
 
 impl Parse for ExprLit {
@@ -379,19 +380,19 @@ impl Parse for ExprLit {
 
 #[derive(Debug)]
 pub struct ExprIndex {
-    expr: Box<Expr>,
-    bracket_token: Bracket,
-    index: Box<Expr>,
+    pub expr: Box<Expr>,
+    pub bracket_token: Bracket,
+    pub index: Box<Expr>,
 }
 
 #[derive(Debug)]
 pub struct ExprIf {
-    if_token: If,
-    cond: Box<Expr>,
-    then_token: then,
-    then_branch: Box<Expr>,
-    else_token: Else,
-    else_branch: Box<Expr>,
+    pub if_token: If,
+    pub cond: Box<Expr>,
+    pub then_token: then,
+    pub then_branch: Box<Expr>,
+    pub else_token: Else,
+    pub else_branch: Box<Expr>,
 }
 
 impl Parse for ExprIf {
@@ -464,8 +465,8 @@ pub struct ExprField {
 
 #[derive(Debug)]
 pub struct ExprUnary {
-    op: UnOp,
-    expr: Box<Expr>,
+    pub op: UnOp,
+    pub expr: Box<Expr>,
 }
 
 impl Parse for ExprUnary {
@@ -479,9 +480,9 @@ impl Parse for ExprUnary {
 
 #[derive(Debug)]
 pub struct ExprBinary {
-    lhs: Box<Expr>,
-    op: BinOp,
-    rhs: Box<Expr>,
+    pub lhs: Box<Expr>,
+    pub op: BinOp,
+    pub rhs: Box<Expr>,
 }
 
 #[derive(Debug)]

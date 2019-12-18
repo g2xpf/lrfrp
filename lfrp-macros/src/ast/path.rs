@@ -9,6 +9,8 @@ use quote::ToTokens;
 
 use proc_macro2::TokenStream;
 
+use std::borrow::Borrow;
+
 use super::types;
 
 #[derive(Clone, Debug)]
@@ -16,9 +18,9 @@ pub struct Path {
     pub segment: PathSegment,
 }
 
-impl Path {
-    pub fn get_ident(&self) -> &Ident {
-        self.segment.get_ident()
+impl Borrow<Ident> for Path {
+    fn borrow(&self) -> &Ident {
+        self.segment.borrow()
     }
 }
 
@@ -51,8 +53,8 @@ pub struct PathSegment {
     pub arguments: PathArguments,
 }
 
-impl PathSegment {
-    pub fn get_ident(&self) -> &Ident {
+impl Borrow<Ident> for PathSegment {
+    fn borrow(&self) -> &Ident {
         &self.ident
     }
 }

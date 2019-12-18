@@ -10,6 +10,8 @@ use super::literals::Lit;
 use super::path::Path;
 use super::types::Type;
 
+use std::borrow::Borrow;
+
 #[allow(dead_code)]
 #[derive(Debug)]
 pub enum Pat {
@@ -120,6 +122,12 @@ pub struct PatTuple {
 #[derive(Debug)]
 pub struct PatPath {
     pub path: Path,
+}
+
+impl Borrow<Ident> for PatPath {
+    fn borrow(&self) -> &Ident {
+        self.path.borrow()
+    }
 }
 
 #[derive(Debug)]
