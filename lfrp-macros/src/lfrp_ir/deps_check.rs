@@ -1,5 +1,6 @@
 use super::deps_trailer::DepExtractor;
 use super::error::{MultipleDefinitionError, NotCalculatedError};
+use super::tsort;
 use super::types::{Dependency, TyCtx, TyCtxRef, Type, VarEnv};
 
 use std::borrow::Borrow;
@@ -102,11 +103,12 @@ pub fn deps_check(
         }
     }
 
-    eprintln!("{:#?}", global);
+    // eprintln!("{:#?}", global);
 
     let deps = extract_deps(&global, &mut frp_stmts)?;
-    println!("{:?}", deps);
+    eprintln!("{:?}", deps);
 
+    let deps_sorted = tsort::run(&deps);
     unimplemented!("deps check")
 }
 
@@ -145,8 +147,7 @@ fn extract_deps(global: &VarEnv, frp_stmts: &mut Vec<ItemFrpStmt>) -> Result<Vec
                     extractor.extract(arrow_expr, true)?;
 
                     let extractor = DepExtractor::new(global, &lhs);
-                    let dep = extractor.extract(expr, false)?;
-                    acc.push(dep);
+                    extractor.extract(expr, false)?;
                     Ok(acc)
                 }
             };

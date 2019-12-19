@@ -13,13 +13,13 @@ use syn::{Ident, Result};
 
 #[derive(Debug)]
 pub enum Type {
-    Type(MaybeType),
+    Mono(TypeMono),
     Lifted(TypeLifted),
 }
 
 impl Type {
     pub fn unresolved() -> Self {
-        Type::Type(MaybeType::Unresolved)
+        Type::Mono(TypeMono::Type(MaybeType::Unresolved))
     }
 
     pub fn unresolved_cell() -> Self {
@@ -27,7 +27,7 @@ impl Type {
     }
 
     pub fn resolved(ty: &types::Type) -> Self {
-        Type::Type(MaybeType::Resolved(Box::new(ty.clone())))
+        Type::Mono(TypeMono::Type(MaybeType::Resolved(Box::new(ty.clone()))))
     }
 
     pub fn from_cell(ty: &types::Type) -> Self {
@@ -49,6 +49,12 @@ impl Type {
     pub fn from_local() -> Self {
         Type::Lifted(TypeLifted::Signal(TypeSignal::Local(MaybeType::Unresolved)))
     }
+}
+
+#[derive(Debug)]
+pub enum TypeMono {
+    Type(MaybeType),
+    Args(MaybeType),
 }
 
 #[derive(Debug)]

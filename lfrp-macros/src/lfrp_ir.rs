@@ -5,6 +5,7 @@ use syn::Result;
 mod error;
 mod deps_check;
 mod deps_trailer;
+mod tsort;
 pub mod types;
 
 use deps_check::deps_check;

@@ -12,18 +12,21 @@ use std::ops::Deref;
 
 use crate::lfrp_ir::types;
 
-use syn::parse::{Parse, ParseStream};
-use syn::Result;
-use syn::{braced, bracketed, parenthesized};
-use syn::{Ident, Member};
+use quote::{quote, ToTokens};
 
+use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::token::{
     Add, And, AndAnd, Bang, Caret, Comma, Div, Dot, EqEq, Ge, Gt, Le, Lt, Ne, Or, OrOr, Rem, Shl,
     Shr, Star, Sub,
 };
 use syn::token::{Brace, Bracket, Colon, Dot2, Else, FatArrow, If, Match, Paren};
+use syn::Result;
 use syn::Token;
+use syn::{braced, bracketed, parenthesized};
+use syn::{Ident, Member};
+
+use proc_macro2::TokenStream;
 
 mod precedence;
 use precedence::Precedence;
@@ -82,6 +85,44 @@ impl Parse for Expr {
     }
 }
 
+impl ToTokens for Expr {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        use Expr::*;
+        match self {
+            Unary(ref e) => e.to_tokens(tokens),
+            Binary(ref e) => e.to_tokens(tokens),
+            // Block(ref e),
+            // Call(ref e),
+            // Field(ref e),
+            // Cast(ref e),
+            If(ref e) => e.to_tokens(tokens),
+            // Index(ref e),
+            Lit(ref e) => e.to_tokens(tokens),
+            // Match(ref e),
+            Paren(ref e) => e.to_tokens(tokens),
+            // Struct(ref e),
+            // Tuple(ref e),
+            Path(ref e) => e.to_tokens(tokens),
+            // List(ref e),
+            // Type(ref e),
+            TypedExpr(ref e, ref ty) => match ty {
+                types::Type::Mono(types::TypeMono::Type(_))
+                | types::Type::Lifted(types::TypeLifted::Cell(_)) => e.to_tokens(tokens),
+                types::Type::Mono(types::TypeMono::Args(_)) => {
+                    // assumne #e is ident
+                    tokens.extend(quote! { self.args.#e })
+                }
+                types::Type::Lifted(types::TypeLifted::Signal(ref ty)) => match ty {
+                    types::TypeSignal::Local(_) => e.to_tokens(tokens),
+                    types::TypeSignal::Input(_) => tokens.extend(quote! { self.input.#e }),
+                    types::TypeSignal::Output(_) => tokens.extend(quote! { self.output.#e }),
+                },
+            },
+            _ => unimplemented!("totokens for expr"),
+        }
+    }
+}
+
 fn ambiguous_expr(input: ParseStream, allow_struct: AllowStruct) -> Result<Expr> {
     let lhs = unary_expr(input, allow_struct)?;
     parse_expr(input, lhs, allow_struct, Precedence::Any)
@@ -105,6 +146,9 @@ fn atom_expr(input: ParseStream, allow_struct: AllowStruct) -> Result<Expr> {
         // substitution for `input.peek(literals::Lit)`
 
         input.parse().map(Expr::Lit)
+    // needs to exclude keyword
+    } else if input.peek(delay) || input.peek(then) {
+        Err(input.error("keywords are not allowed"))
     } else if input.peek(Ident) {
         path_or_struct(input, allow_struct)
     } else if input.peek(Paren) {
@@ -295,6 +339,12 @@ impl Parse for ExprPath {
     }
 }
 
+impl ToTokens for ExprPath {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.path.to_tokens(tokens);
+    }
+}
+
 #[derive(Debug)]
 pub struct ExprTuple {
     paren_token: Paren,
@@ -305,6 +355,13 @@ pub struct ExprTuple {
 pub struct ExprParen {
     pub paren_token: Paren,
     pub expr: Box<Expr>,
+}
+
+impl ToTokens for ExprParen {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.paren_token
+            .surround(tokens, |tokens| self.expr.to_tokens(tokens))
+    }
 }
 
 #[derive(Debug)]
@@ -378,6 +435,12 @@ impl Parse for ExprLit {
     }
 }
 
+impl ToTokens for ExprLit {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.lit.to_tokens(tokens)
+    }
+}
+
 #[derive(Debug)]
 pub struct ExprIndex {
     pub expr: Box<Expr>,
@@ -406,6 +469,10 @@ impl Parse for ExprIf {
             else_branch: Box::new(input.parse()?),
         })
     }
+}
+
+impl ToTokens for ExprIf {
+    fn to_tokens(&self, tokens: &mut TokenStream) {}
 }
 
 #[derive(Debug)]
@@ -478,11 +545,39 @@ impl Parse for ExprUnary {
     }
 }
 
+impl ToTokens for ExprUnary {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.op.to_tokens(tokens);
+        self.expr.to_tokens(tokens);
+    }
+}
+
 #[derive(Debug)]
 pub struct ExprBinary {
     pub lhs: Box<Expr>,
     pub op: BinOp,
     pub rhs: Box<Expr>,
+}
+
+impl ToTokens for ExprBinary {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let lhs = &self.lhs;
+        let op = &self.op;
+        let rhs = &self.rhs;
+        // TODO: choose pow or ipow depends on its type
+        match op {
+            BinOp::Pow(_) => {
+                tokens.extend(quote! {
+                    (#lhs as f32).lpow(#rhs as f32)
+                });
+            }
+            _ => {
+                self.lhs.to_tokens(tokens);
+                self.op.to_tokens(tokens);
+                self.rhs.to_tokens(tokens);
+            }
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -500,6 +595,16 @@ impl Parse for UnOp {
             Ok(input.parse().map(UnOp::Neg)?)
         } else {
             Err(lookahead.error())
+        }
+    }
+}
+
+impl ToTokens for UnOp {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        use UnOp::*;
+        match self {
+            Not(ref op) => op.to_tokens(tokens),
+            Neg(ref op) => op.to_tokens(tokens),
         }
     }
 }
@@ -593,6 +698,33 @@ impl Parse for BinOp {
             input.parse().map(BinOp::Gt)
         } else {
             Err(input.error("expected binary operator"))
+        }
+    }
+}
+
+impl ToTokens for BinOp {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        use BinOp::*;
+        match self {
+            Add(ref e) => e.to_tokens(tokens),
+            Sub(ref e) => e.to_tokens(tokens),
+            Mul(ref e) => e.to_tokens(tokens),
+            Div(ref e) => e.to_tokens(tokens),
+            Rem(ref e) => e.to_tokens(tokens),
+            And(ref e) => e.to_tokens(tokens),
+            Or(ref e) => e.to_tokens(tokens),
+            BitXor(ref e) => e.to_tokens(tokens),
+            BitAnd(ref e) => e.to_tokens(tokens),
+            BitOr(ref e) => e.to_tokens(tokens),
+            Shl(ref e) => e.to_tokens(tokens),
+            Shr(ref e) => e.to_tokens(tokens),
+            Eq(ref e) => e.to_tokens(tokens),
+            Lt(ref e) => e.to_tokens(tokens),
+            Le(ref e) => e.to_tokens(tokens),
+            Ne(ref e) => e.to_tokens(tokens),
+            Ge(ref e) => e.to_tokens(tokens),
+            Gt(ref e) => e.to_tokens(tokens),
+            Pow(_) => unreachable!(),
         }
     }
 }
