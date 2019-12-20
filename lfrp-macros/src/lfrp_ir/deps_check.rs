@@ -12,21 +12,64 @@ use syn::Result;
 
 use std::collections::hash_map::Entry;
 
+#[derive(Debug)]
+pub struct OrderedStmts {
+    dependencies: Vec<FrpStmtDependency>,
+    arrows: Vec<FrpStmtArrow>,
+}
+
 pub fn deps_check(
     input: &ItemIn,
     output: &ItemOut,
     args: &Option<ItemArgs>,
     mut frp_stmts: Vec<ItemFrpStmt>,
-) -> Result<Vec<ItemFrpStmt>> {
+) -> Result<OrderedStmts> {
     // collect identifiers of global let-bindings
-    let global = collect_global_idents(&input, &output, &args, &frp_stmts)?;
+    let calculation_order = {
+        let global = collect_global_idents(&input, &output, &args, &frp_stmts)?;
 
-    let deps = extract_deps(&global, &mut frp_stmts)?;
-    eprintln!("{:#?}", deps);
+        let deps = extract_deps(&global, &mut frp_stmts)?;
+        // eprintln!("{:#?}", deps);
+        tsort::tsort(&deps)?
+    };
 
-    let order = tsort::tsort(&deps)?;
-    // let deps_sorted = tsort::tsort(&deps);
-    unimplemented!()
+    // eprintln!("{:?}", calculation_order);
+
+    Ok(generate_ordered_stmts(frp_stmts, calculation_order))
+}
+
+fn generate_ordered_stmts(
+    frp_stmts: Vec<ItemFrpStmt>,
+    calculation_order: Vec<String>,
+) -> OrderedStmts {
+    let mut stmt_map = HashMap::new();
+    let mut dependencies = vec![];
+    let mut arrows = vec![];
+
+    frp_stmts.into_iter().for_each(|frp_stmt| match frp_stmt {
+        ItemFrpStmt::Dependency(dep) => {
+            let lhs: Var = match &dep.pat {
+                Pat::Wild(_) => return,
+                Pat::Ident(PatIdent { ref ident, .. }) => ident,
+                _ => unimplemented!(),
+            };
+            stmt_map.insert(lhs.to_string(), dep);
+        }
+        ItemFrpStmt::Arrow(arrow) => {
+            arrows.push(arrow);
+        }
+    });
+
+    calculation_order.iter().for_each(|s| {
+        if let Some(frp_stmt) = stmt_map.remove(s) {
+            dependencies.push(frp_stmt);
+        }
+    });
+
+    OrderedStmts {
+        dependencies,
+        arrows,
+    }
 }
 
 fn extract_deps<'a, 'b>(

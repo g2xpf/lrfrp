@@ -1,4 +1,4 @@
-use super::ast::{self, Item, ItemFrpStmt};
+use super::ast::{self, Item};
 use syn::Result;
 
 #[macro_use]
@@ -16,7 +16,7 @@ pub struct LfrpIR {
     input: ast::ItemIn,
     output: ast::ItemOut,
     args: Option<ast::ItemArgs>,
-    body: Vec<ast::ItemFrpStmt>,
+    body: deps_check::OrderedStmts,
 }
 
 impl LfrpIR {

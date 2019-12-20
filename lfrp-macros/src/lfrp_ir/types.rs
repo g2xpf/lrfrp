@@ -54,7 +54,7 @@ pub enum TypeMono {
     Args(MaybeType),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum TypeLifted {
     Cell(MaybeType),
     Signal(TypeSignal),
@@ -70,7 +70,7 @@ impl fmt::Display for TypeLifted {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum TypeSignal {
     Local(MaybeType),
     Input(MaybeType),
@@ -88,7 +88,7 @@ impl fmt::Display for TypeSignal {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum MaybeType {
     Unresolved,
     Resolved(Box<types::Type>),

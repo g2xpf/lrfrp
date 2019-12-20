@@ -27,15 +27,15 @@ macro_rules! item_unwrap {
 }
 
 #[derive(Debug)]
-pub struct UndefinedVariableError<'a>(&'a Ident);
+pub struct UndefinedVariableError(Ident);
 
-impl<'a> UndefinedVariableError<'a> {
-    pub fn new(ident: &'a Ident) -> Self {
-        UndefinedVariableError(ident)
+impl UndefinedVariableError {
+    pub fn new(ident: Var) -> Self {
+        UndefinedVariableError(ident.clone())
     }
 }
 
-impl<'a> Into<syn::Error> for UndefinedVariableError<'a> {
+impl Into<syn::Error> for UndefinedVariableError {
     fn into(self) -> syn::Error {
         let token = &self.0;
         let message = format!("Undefined variable `{}`", token.to_string());
@@ -44,15 +44,15 @@ impl<'a> Into<syn::Error> for UndefinedVariableError<'a> {
 }
 
 #[derive(Debug)]
-pub struct MultipleDefinitionError<'a>(&'a Ident);
+pub struct MultipleDefinitionError(Ident);
 
-impl<'a> MultipleDefinitionError<'a> {
-    pub fn new(ident: &'a Ident) -> Self {
-        MultipleDefinitionError(ident)
+impl MultipleDefinitionError {
+    pub fn new(ident: Var) -> Self {
+        MultipleDefinitionError(ident.clone())
     }
 }
 
-impl<'a> Into<syn::Error> for MultipleDefinitionError<'a> {
+impl Into<syn::Error> for MultipleDefinitionError {
     fn into(self) -> syn::Error {
         let token = &self.0;
         let message = format!("Multiple definition `{}`", token.to_string());
@@ -61,15 +61,15 @@ impl<'a> Into<syn::Error> for MultipleDefinitionError<'a> {
 }
 
 #[derive(Debug)]
-pub struct NotCalculatedError<'a>(&'a Ident);
+pub struct NotCalculatedError(Ident);
 
-impl<'a> NotCalculatedError<'a> {
-    pub fn new(ident: &'a Ident) -> Self {
-        NotCalculatedError(ident)
+impl NotCalculatedError {
+    pub fn new(ident: &Ident) -> Self {
+        NotCalculatedError(ident.clone())
     }
 }
 
-impl<'a> Into<syn::Error> for NotCalculatedError<'a> {
+impl Into<syn::Error> for NotCalculatedError {
     fn into(self) -> syn::Error {
         let token = &self.0;
         let message = format!(
@@ -81,15 +81,15 @@ impl<'a> Into<syn::Error> for NotCalculatedError<'a> {
 }
 
 #[derive(Debug)]
-pub struct LiftedTypeNotAllowedError<'a>(Var<'a>, &'a TypeLifted);
+pub struct LiftedTypeNotAllowedError(Ident, TypeLifted);
 
-impl<'a> LiftedTypeNotAllowedError<'a> {
-    pub fn new(var: Var<'a>, type_lifted: &'a TypeLifted) -> Self {
-        LiftedTypeNotAllowedError(var, type_lifted)
+impl LiftedTypeNotAllowedError {
+    pub fn new(var: Var, type_lifted: &TypeLifted) -> Self {
+        LiftedTypeNotAllowedError(var.clone(), type_lifted.clone())
     }
 }
 
-impl<'a> Into<syn::Error> for LiftedTypeNotAllowedError<'a> {
+impl Into<syn::Error> for LiftedTypeNotAllowedError {
     fn into(self) -> syn::Error {
         let token = self.0;
         let ty = &self.1;
@@ -103,15 +103,15 @@ impl<'a> Into<syn::Error> for LiftedTypeNotAllowedError<'a> {
 }
 
 #[derive(Debug)]
-pub struct CyclicDependencyError<'a>(pub Var<'a>);
+pub struct CyclicDependencyError(Ident);
 
-impl<'a> CyclicDependencyError<'a> {
-    pub fn new(ident: &'a Var) -> Self {
-        CyclicDependencyError(ident)
+impl CyclicDependencyError {
+    pub fn new(ident: Var) -> Self {
+        CyclicDependencyError(ident.clone())
     }
 }
 
-impl<'a> Into<syn::Error> for CyclicDependencyError<'a> {
+impl Into<syn::Error> for CyclicDependencyError {
     fn into(self) -> syn::Error {
         let token = &self.0;
         let message = format!(

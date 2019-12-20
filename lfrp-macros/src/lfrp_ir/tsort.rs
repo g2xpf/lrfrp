@@ -14,9 +14,7 @@ enum SearchState {
     Searched,
 }
 
-pub fn tsort<'a>(
-    deps: &'a HashMap<Var<'a>, HashSet<Var<'a>>>,
-) -> Result<impl Iterator<Item = Var<'a>>>
+pub fn tsort<'a>(deps: &'a HashMap<Var<'a>, HashSet<Var<'a>>>) -> Result<Vec<String>>
 where
 {
     let mut dependencies: HashMap<Var, HashSet<Var>> = HashMap::new();
@@ -56,7 +54,11 @@ where
             Ok(acc)
         })?;
 
-    Ok(result.into_iter().rev())
+    Ok(result
+        .into_iter()
+        .map(|var| var.to_string())
+        .rev()
+        .collect())
 }
 
 fn dfs<'a>(
@@ -74,7 +76,7 @@ fn dfs<'a>(
         Some(s) => match s {
             SearchState::Unsearched => *s = SearchState::Searching,
             SearchState::Searching => {
-                return Err(CyclicDependencyError(*node).into());
+                return Err(CyclicDependencyError::new(node).into());
             }
             SearchState::Searched => return Ok(res),
         },
