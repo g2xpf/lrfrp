@@ -1,27 +1,86 @@
 use super::deps_trailer::DepExtractor;
 use super::error::{MultipleDefinitionError, NotCalculatedError};
 use super::tsort;
-use super::types::{Dependency, TyCtx, TyCtxRef, Type, VarEnv};
+use super::types::{Type, Var, VarEnv};
 
 use std::borrow::Borrow;
+use std::collections::{HashMap, HashSet};
 
 use crate::ast::patterns::{Pat, PatIdent};
-use crate::ast::{
-    Field, FrpStmtArrow, FrpStmtDependency, ItemArgs, ItemFrpStmt, ItemIn, ItemMod, ItemOut,
-};
-use syn::{Ident, Result};
+use crate::ast::{Field, FrpStmtArrow, FrpStmtDependency, ItemArgs, ItemFrpStmt, ItemIn, ItemOut};
+use syn::Result;
 
-use std::cell::RefCell;
 use std::collections::hash_map::Entry;
 
 pub fn deps_check(
-    module: &ItemMod,
     input: &ItemIn,
     output: &ItemOut,
     args: &Option<ItemArgs>,
     mut frp_stmts: Vec<ItemFrpStmt>,
 ) -> Result<Vec<ItemFrpStmt>> {
     // collect identifiers of global let-bindings
+    let global = collect_global_idents(&input, &output, &args, &frp_stmts)?;
+
+    let deps = extract_deps(&global, &mut frp_stmts)?;
+    eprintln!("{:#?}", deps);
+
+    let order = tsort::tsort(&deps)?;
+    // let deps_sorted = tsort::tsort(&deps);
+    unimplemented!()
+}
+
+fn extract_deps<'a, 'b>(
+    global: &'a VarEnv,
+    frp_stmts: &'b mut Vec<ItemFrpStmt>,
+) -> Result<HashMap<Var<'b>, HashSet<Var<'b>>>> {
+    frp_stmts
+        .iter_mut()
+        .try_fold(HashMap::new(), |mut acc, frp_stmt| {
+            let e = match frp_stmt {
+                ItemFrpStmt::Dependency(FrpStmtDependency {
+                    ref pat,
+                    ref mut expr,
+                    ..
+                }) => {
+                    let lhs: Var = match pat {
+                        Pat::Wild(_) => return Ok(acc),
+                        Pat::Ident(PatIdent { ref ident, .. }) => ident,
+                        _ => unimplemented!(),
+                    };
+                    let extractor = DepExtractor::new(global, lhs);
+                    let (lhs, dep) = extractor.extract(expr, false)?;
+                    acc.insert(lhs, dep);
+                    Ok(acc)
+                }
+                ItemFrpStmt::Arrow(FrpStmtArrow {
+                    pat,
+                    ref mut arrow_expr,
+                    ref mut expr,
+                    ..
+                }) => {
+                    let lhs = match pat {
+                        Pat::Wild(_) => return Ok(acc),
+                        Pat::Ident(PatIdent { ident, .. }) => ident,
+                        _ => unimplemented!(),
+                    };
+                    let extractor = DepExtractor::new(global, &lhs);
+                    extractor.extract(arrow_expr, true)?;
+
+                    let extractor = DepExtractor::new(global, &lhs);
+                    extractor.extract(expr, false)?;
+                    Ok(acc)
+                }
+            };
+            e
+        })
+}
+
+fn collect_global_idents(
+    input: &ItemIn,
+    output: &ItemOut,
+    args: &Option<ItemArgs>,
+    frp_stmts: &Vec<ItemFrpStmt>,
+) -> Result<VarEnv> {
     let mut global =
         frp_stmts
             .iter()
@@ -32,7 +91,7 @@ pub fn deps_check(
                         Pat::Ident(e) => &e.ident,
                         e => unimplemented!("uncovered pattern: {:?}", e),
                     };
-                    match acc.entry(ident.to_string()) {
+                    match acc.entry(ident.clone()) {
                         Entry::Vacant(e) => {
                             e.insert(Type::from_cell(&arrow.ty));
                         }
@@ -48,7 +107,7 @@ pub fn deps_check(
                         Pat::Ident(e) => &e.ident,
                         e => unimplemented!("uncovered pattern: {:?}", e),
                     };
-                    match acc.entry(ident.to_string()) {
+                    match acc.entry(ident.clone()) {
                         Entry::Vacant(e) => {
                             e.insert(Type::from_local());
                         }
@@ -65,7 +124,7 @@ pub fn deps_check(
         .fields
         .iter()
         .try_for_each::<_, Result<_>>(|Field { ident, ty, .. }| {
-            match global.entry(ident.to_string()) {
+            match global.entry(ident.clone()) {
                 Entry::Occupied(ref mut e) => {
                     let untyped = e.get_mut();
                     *untyped = Type::from_output(ty);
@@ -80,7 +139,7 @@ pub fn deps_check(
         .fields
         .iter()
         .try_for_each::<_, Result<_>>(|Field { ident, ty, .. }| {
-            match global.entry(ident.to_string()) {
+            match global.entry(ident.clone()) {
                 Entry::Vacant(e) => {
                     e.insert(Type::from_input(ty));
                     Ok(())
@@ -94,7 +153,7 @@ pub fn deps_check(
         for field in args.fields.iter() {
             let ident = &field.ident;
             let ty = &field.ty;
-            match global.entry(ident.to_string()) {
+            match global.entry(ident.clone()) {
                 Entry::Vacant(e) => {
                     e.insert(Type::resolved(ty));
                 }
@@ -103,54 +162,5 @@ pub fn deps_check(
         }
     }
 
-    // eprintln!("{:#?}", global);
-
-    let deps = extract_deps(&global, &mut frp_stmts)?;
-    eprintln!("{:?}", deps);
-
-    let deps_sorted = tsort::run(&deps);
-    unimplemented!("deps check")
-}
-
-fn extract_deps(global: &VarEnv, frp_stmts: &mut Vec<ItemFrpStmt>) -> Result<Vec<Dependency>> {
-    frp_stmts
-        .iter_mut()
-        .try_fold(vec![], |mut acc, mut frp_stmt| {
-            let e = match &mut frp_stmt {
-                ItemFrpStmt::Dependency(FrpStmtDependency {
-                    ref pat,
-                    ref mut expr,
-                    ..
-                }) => {
-                    let lhs = match pat {
-                        Pat::Wild(_) => return Ok(acc),
-                        Pat::Ident(PatIdent { ident, .. }) => ident.to_string(),
-                        _ => unimplemented!(),
-                    };
-                    let extractor = DepExtractor::new(global, &lhs);
-                    let dep = extractor.extract(expr, false)?;
-                    acc.push(dep);
-                    Ok(acc)
-                }
-                ItemFrpStmt::Arrow(FrpStmtArrow {
-                    pat,
-                    ref mut arrow_expr,
-                    ref mut expr,
-                    ..
-                }) => {
-                    let lhs = match pat {
-                        Pat::Wild(_) => return Ok(acc),
-                        Pat::Ident(PatIdent { ident, .. }) => ident.to_string(),
-                        _ => unimplemented!(),
-                    };
-                    let extractor = DepExtractor::new(global, &lhs);
-                    extractor.extract(arrow_expr, true)?;
-
-                    let extractor = DepExtractor::new(global, &lhs);
-                    extractor.extract(expr, false)?;
-                    Ok(acc)
-                }
-            };
-            e
-        })
+    Ok(global)
 }

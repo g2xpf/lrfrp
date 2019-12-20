@@ -1,27 +1,25 @@
 use super::types::{Dependency, TyCtx, TyCtxRef, Var, VarEnv};
-use crate::ast::expressions::{
-    ArrowExpr, Expr, ExprBinary, ExprBlock, ExprCall, ExprCast, ExprField, ExprIf, ExprIndex,
-    ExprList, ExprLit, ExprMatch, ExprParen, ExprPath, ExprStruct, ExprTuple, ExprType, ExprUnary,
-};
+use crate::ast::expressions::{ArrowExpr, Expr, ExprPath};
 use std::cell::RefCell;
 use syn::Result;
 
-pub type Context<'a, 'b, 'c> = &'a TyCtxRef<'b, 'c>;
+pub type Context<'a, 'b, 'c, 'd> = &'a TyCtxRef<'b, 'c, 'd>;
 
-pub struct DepExtractor<'a> {
+pub struct DepExtractor<'a, 'b> {
     global: &'a VarEnv,
-    lhs: &'a Var,
+    lhs: Var<'b>,
 }
 
-impl<'a> DepExtractor<'a> {
-    pub fn new(global: &'a VarEnv, lhs: &'a Var) -> Self {
+impl<'a, 'b> DepExtractor<'a, 'b> {
+    pub fn new(global: &'a VarEnv, lhs: Var<'b>) -> Self {
         DepExtractor { global, lhs }
     }
 
-    pub fn extract<T>(&self, t: &mut T, forbid_lifted: bool) -> Result<Dependency>
-    where
-        T: DepsTrailer,
-    {
+    pub fn extract<T: DepsTrailer<'b>>(
+        &self,
+        t: &'b mut T,
+        forbid_lifted: bool,
+    ) -> Result<Dependency<'b>> {
         let tcx = TyCtx::new(&self.global, &self.lhs, forbid_lifted);
         let tcx_cell = RefCell::new(tcx);
         {
@@ -32,12 +30,12 @@ impl<'a> DepExtractor<'a> {
     }
 }
 
-pub trait DepsTrailer {
-    fn deps_trailer(&mut self, context: Context);
+pub trait DepsTrailer<'a> {
+    fn deps_trailer(&'a mut self, context: Context<'_, '_, '_, 'a>);
 }
 
-impl DepsTrailer for Expr {
-    fn deps_trailer(&mut self, context: Context) {
+impl<'a> DepsTrailer<'a> for Expr {
+    fn deps_trailer(&'a mut self, context: Context<'_, '_, '_, 'a>) {
         use Expr::*;
         match self {
             Paren(e) => e.expr.deps_trailer(context),
@@ -59,14 +57,14 @@ impl DepsTrailer for Expr {
     }
 }
 
-impl DepsTrailer for ExprPath {
-    fn deps_trailer(&mut self, context: Context) {
+impl<'a> DepsTrailer<'a> for ExprPath {
+    fn deps_trailer(&'a mut self, context: Context<'_, '_, '_, 'a>) {
         context.insert_variable(&self.path);
     }
 }
 
-impl DepsTrailer for ArrowExpr {
-    fn deps_trailer(&mut self, context: Context) {
+impl<'a> DepsTrailer<'a> for ArrowExpr {
+    fn deps_trailer(&'a mut self, context: Context<'_, '_, '_, 'a>) {
         self.expr.deps_trailer(context)
     }
 }

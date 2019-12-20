@@ -81,22 +81,42 @@ impl<'a> Into<syn::Error> for NotCalculatedError<'a> {
 }
 
 #[derive(Debug)]
-pub struct LiftedTypeNotAllowedError<'a>(&'a Ident, &'a TypeLifted);
+pub struct LiftedTypeNotAllowedError<'a>(Var<'a>, &'a TypeLifted);
 
 impl<'a> LiftedTypeNotAllowedError<'a> {
-    pub fn new(ident: &'a Ident, type_lifted: &'a TypeLifted) -> Self {
-        LiftedTypeNotAllowedError(ident, type_lifted)
+    pub fn new(var: Var<'a>, type_lifted: &'a TypeLifted) -> Self {
+        LiftedTypeNotAllowedError(var, type_lifted)
     }
 }
 
 impl<'a> Into<syn::Error> for LiftedTypeNotAllowedError<'a> {
     fn into(self) -> syn::Error {
-        let token = &self.0;
+        let token = self.0;
         let ty = &self.1;
         let message = format!(
             "Variable `{}` has the lifted type `{}`",
             token.to_string(),
             ty.to_string()
+        );
+        syn::Error::new_spanned(token, message)
+    }
+}
+
+#[derive(Debug)]
+pub struct CyclicDependencyError<'a>(pub Var<'a>);
+
+impl<'a> CyclicDependencyError<'a> {
+    pub fn new(ident: &'a Var) -> Self {
+        CyclicDependencyError(ident)
+    }
+}
+
+impl<'a> Into<syn::Error> for CyclicDependencyError<'a> {
+    fn into(self) -> syn::Error {
+        let token = &self.0;
+        let message = format!(
+            "cyclic dependency found in the definition `{}`",
+            token.to_string(),
         );
         syn::Error::new_spanned(token, message)
     }

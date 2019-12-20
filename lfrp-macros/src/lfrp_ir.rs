@@ -3,12 +3,12 @@ use syn::Result;
 
 #[macro_use]
 mod error;
+mod codegen;
 mod deps_check;
 mod deps_trailer;
 mod tsort;
+mod typeck;
 pub mod types;
-
-use deps_check::deps_check;
 
 #[derive(Debug)]
 pub struct LfrpIR {
@@ -44,7 +44,8 @@ impl LfrpIR {
         item_unwrap!(input, "In");
         item_unwrap!(output, "Out");
 
-        let body = deps_check(&module, &input, &output, &args, frp_stmts)?;
+        // typeck::typeck(&input, &output, &args, &mut frp_stmts)?;
+        let body = deps_check::deps_check(&input, &output, &args, frp_stmts)?;
 
         Ok(LfrpIR {
             module,

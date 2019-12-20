@@ -1,12 +1,9 @@
 use super::error::{LiftedTypeNotAllowedError, UndefinedVariableError};
-use crate::ast::expressions::{Expr, ExprPath};
 
 use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
-
-use crate::ast::{patterns::Pat, FrpStmtArrow, FrpStmtDependency, ItemFrpStmt};
 
 use crate::ast::types;
 use syn::{Ident, Result};
@@ -107,26 +104,26 @@ impl fmt::Display for MaybeType {
     }
 }
 
-pub type Var = String;
-pub type Dependency = (Var, HashSet<Var>);
-pub type VarEnv = HashMap<Var, Type>;
+pub type Var<'a> = &'a Ident;
+pub type Dependency<'a> = (Var<'a>, HashSet<Var<'a>>);
+pub type VarEnv = HashMap<Ident, Type>;
 
-pub struct TyCtx<'a> {
+pub struct TyCtx<'a, 'b> {
     global: &'a VarEnv,
     scope: usize,
     local: Vec<VarEnv>,
-    deps: Dependency,
+    deps: Dependency<'b>,
     errors: Vec<syn::Error>,
     forbid_lifted: bool,
 }
 
-impl<'a> TyCtx<'a> {
-    pub fn new(global: &'a VarEnv, lhs: &Var, forbid_lifted: bool) -> Self {
+impl<'a, 'b> TyCtx<'a, 'b> {
+    pub fn new(global: &'a VarEnv, lhs: Var<'b>, forbid_lifted: bool) -> Self {
         let mut ty_ctx = TyCtx {
             global,
             scope: 0,
             local: vec![],
-            deps: (lhs.clone(), HashSet::new()),
+            deps: (lhs, HashSet::new()),
             errors: vec![],
             forbid_lifted,
         };
@@ -134,10 +131,10 @@ impl<'a> TyCtx<'a> {
         ty_ctx
     }
 
-    pub fn try_get_deps(self) -> Result<Dependency> {
+    pub fn try_get_deps(self) -> Result<Dependency<'b>> {
         if !self.errors.is_empty() {
             let mut iter = self.errors.into_iter();
-            let head = iter.next().unwrap();
+            let head = iter.next().unwrap_or_else(|| unreachable!());
             Err(iter.fold(head, |mut acc, error| {
                 acc.combine(error);
                 acc
@@ -151,17 +148,16 @@ impl<'a> TyCtx<'a> {
         self.forbid_lifted
     }
 
-    fn insert_local(&mut self, var: &Var) {
+    fn insert_local(&mut self, var: Var<'b>) {
         self.local[self.scope - 1].insert(var.clone(), Type::unresolved());
     }
 
-    fn insert_variable<P>(&mut self, expr_path: &P)
+    fn insert_variable<P>(&mut self, expr_path: &'b P)
     where
         P: Borrow<Ident>,
     {
         // search local scope
-        let ident = expr_path.borrow();
-        let key = ident.to_string();
+        let key = expr_path.borrow();
         for scope in (0..self.scope).rev() {
             if self.local[scope].contains_key(&key) {
                 return;
@@ -172,14 +168,14 @@ impl<'a> TyCtx<'a> {
         if let Some(ty) = self.global.get(&key) {
             match ty {
                 Type::Lifted(ty) if self.forbid_lifted() => {
-                    self.push_error(LiftedTypeNotAllowedError::new(ident, ty))
+                    self.push_error(LiftedTypeNotAllowedError::new(key, ty))
                 }
                 _ => {
                     self.deps.1.insert(key);
                 }
             }
         } else {
-            self.push_error(UndefinedVariableError::new(ident))
+            self.push_error(UndefinedVariableError::new(key))
         }
     }
 
@@ -201,18 +197,18 @@ impl<'a> TyCtx<'a> {
     }
 }
 
-pub struct TyCtxRef<'a, 'b: 'a>(&'a RefCell<TyCtx<'b>>);
+pub struct TyCtxRef<'a, 'b: 'a, 'c: 'a>(&'a RefCell<TyCtx<'b, 'c>>);
 
-impl<'a, 'b> TyCtxRef<'a, 'b> {
-    pub fn new(tcx: &'a RefCell<TyCtx<'b>>) -> Self {
+impl<'a, 'b, 'c> TyCtxRef<'a, 'b, 'c> {
+    pub fn new(tcx: &'a RefCell<TyCtx<'b, 'c>>) -> Self {
         TyCtxRef(tcx)
     }
 
-    pub fn insert_local(&self, var: &Var) {
+    pub fn insert_local(&self, var: Var<'c>) {
         self.0.borrow_mut().insert_local(var)
     }
 
-    pub fn insert_variable<P>(&self, expr_path: &P)
+    pub fn insert_variable<P>(&self, expr_path: &'c P)
     where
         P: Borrow<Ident>,
     {
@@ -231,7 +227,7 @@ impl<'a, 'b> TyCtxRef<'a, 'b> {
     }
 }
 
-impl Drop for TyCtxRef<'_, '_> {
+impl Drop for TyCtxRef<'_, '_, '_> {
     fn drop(&mut self) {
         self.0.borrow_mut().unscoped();
     }
