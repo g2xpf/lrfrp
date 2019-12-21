@@ -1,5 +1,5 @@
 [package]
-name = "lfrp-test"
+name = "lfrp-examples"
 version = "0.1.0"
 authors = ["g2xpf <nameko.jack@gmail.com>"]
 edition = "2018"
@@ -8,3 +8,4 @@ edition = "2018"
 
 [dependencies]
 lfrp-macros = { path = "../lfrp-macros", version = "0.1" }
+ansi-escapes = "*"

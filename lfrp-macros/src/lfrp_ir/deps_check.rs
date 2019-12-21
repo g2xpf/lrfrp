@@ -6,16 +6,74 @@ use super::types::{Type, Var, VarEnv};
 use std::borrow::Borrow;
 use std::collections::{HashMap, HashSet};
 
-use crate::ast::patterns::{Pat, PatIdent};
 use crate::ast::{Field, FrpStmtArrow, FrpStmtDependency, ItemArgs, ItemFrpStmt, ItemIn, ItemOut};
-use syn::Result;
+use syn::{Ident, Result};
+
+use proc_macro2::TokenStream;
+
+use quote::{quote, ToTokens};
 
 use std::collections::hash_map::Entry;
 
 #[derive(Debug)]
 pub struct OrderedStmts {
     dependencies: Vec<FrpStmtDependency>,
-    arrows: Vec<FrpStmtArrow>,
+    arrows: HashMap<String, FrpStmtArrow>,
+}
+
+impl OrderedStmts {
+    pub fn cell_definition(&self) -> TokenStream {
+        let mut fields = TokenStream::new();
+        for (_, arrow) in self.arrows.iter() {
+            let ident: &Ident = &arrow.path.borrow();
+            let colon_token = &arrow.colon_token;
+            let ty = &arrow.ty;
+            let field = quote! {
+                #ident #colon_token #ty,
+            };
+            fields.extend(field);
+        }
+
+        quote! {
+            #[derive(Clone, Default)]
+            struct Cell {
+                #fields
+            }
+        }
+    }
+
+    pub fn calculations(&self) -> TokenStream {
+        let mut calculations = TokenStream::new();
+        self.dependencies.iter().for_each(|dep| {
+            dep.to_tokens(&mut calculations);
+        });
+        calculations
+    }
+
+    pub fn cell_updates(&self) -> TokenStream {
+        let mut cell_updates = TokenStream::new();
+        for (_, arrow) in self.arrows.iter() {
+            let path = &arrow.path;
+            let expr = &arrow.expr;
+            cell_updates.extend(quote! {
+                #path = #expr;
+            });
+        }
+
+        cell_updates
+    }
+
+    pub fn cell_initializations(&self) -> TokenStream {
+        let mut cell_initializations = TokenStream::new();
+        for (_, arrow) in self.arrows.iter() {
+            let path = &arrow.path;
+            let expr = &arrow.arrow_expr.expr;
+            cell_initializations.extend(quote! {
+                #path = #expr;
+            });
+        }
+        cell_initializations
+    }
 }
 
 pub fn deps_check(
@@ -29,11 +87,8 @@ pub fn deps_check(
         let global = collect_global_idents(&input, &output, &args, &frp_stmts)?;
 
         let deps = extract_deps(&global, &mut frp_stmts)?;
-        // eprintln!("{:#?}", deps);
         tsort::tsort(&deps)?
     };
-
-    // eprintln!("{:?}", calculation_order);
 
     Ok(generate_ordered_stmts(frp_stmts, calculation_order))
 }
@@ -44,19 +99,16 @@ fn generate_ordered_stmts(
 ) -> OrderedStmts {
     let mut stmt_map = HashMap::new();
     let mut dependencies = vec![];
-    let mut arrows = vec![];
+    let mut arrows = HashMap::new();
 
     frp_stmts.into_iter().for_each(|frp_stmt| match frp_stmt {
         ItemFrpStmt::Dependency(dep) => {
-            let lhs: Var = match &dep.pat {
-                Pat::Wild(_) => return,
-                Pat::Ident(PatIdent { ref ident, .. }) => ident,
-                _ => unimplemented!(),
-            };
-            stmt_map.insert(lhs.to_string(), dep);
+            let ident: &Ident = &dep.path.borrow();
+            stmt_map.insert(ident.to_string(), dep);
         }
         ItemFrpStmt::Arrow(arrow) => {
-            arrows.push(arrow);
+            let ident: &Ident = arrow.path.borrow();
+            arrows.insert(ident.to_string(), arrow);
         }
     });
 
@@ -81,35 +133,33 @@ fn extract_deps<'a, 'b>(
         .try_fold(HashMap::new(), |mut acc, frp_stmt| {
             let e = match frp_stmt {
                 ItemFrpStmt::Dependency(FrpStmtDependency {
-                    ref pat,
+                    ref mut path,
                     ref mut expr,
                     ..
                 }) => {
-                    let lhs: Var = match pat {
-                        Pat::Wild(_) => return Ok(acc),
-                        Pat::Ident(PatIdent { ref ident, .. }) => ident,
-                        _ => unimplemented!(),
-                    };
-                    let extractor = DepExtractor::new(global, lhs);
+                    let ty = global.get(Borrow::<Ident>::borrow(path));
+                    if let Some(ty) = ty {
+                        path.typing(ty);
+                    }
+                    let ident = Borrow::<Ident>::borrow(path);
+                    let extractor = DepExtractor::new(global, ident);
                     let (lhs, dep) = extractor.extract(expr, false)?;
-                    acc.insert(lhs, dep);
+                    acc.insert(ident, dep);
                     Ok(acc)
                 }
                 ItemFrpStmt::Arrow(FrpStmtArrow {
-                    pat,
+                    ref mut path,
+                    ty,
                     ref mut arrow_expr,
                     ref mut expr,
                     ..
                 }) => {
-                    let lhs = match pat {
-                        Pat::Wild(_) => return Ok(acc),
-                        Pat::Ident(PatIdent { ident, .. }) => ident,
-                        _ => unimplemented!(),
-                    };
-                    let extractor = DepExtractor::new(global, &lhs);
+                    path.typing(&Type::from_cell(ty));
+                    let ident: &Ident = Borrow::<Ident>::borrow(path);
+                    let extractor = DepExtractor::new(global, ident);
                     extractor.extract(arrow_expr, true)?;
 
-                    let extractor = DepExtractor::new(global, &lhs);
+                    let extractor = DepExtractor::new(global, ident);
                     extractor.extract(expr, false)?;
                     Ok(acc)
                 }
@@ -129,11 +179,7 @@ fn collect_global_idents(
             .iter()
             .try_fold::<_, _, Result<_>>(VarEnv::new(), |mut acc, frp_stmt| match frp_stmt {
                 ItemFrpStmt::Arrow(ref arrow) => {
-                    let ident = match &arrow.pat {
-                        Pat::Path(e) => e.borrow(),
-                        Pat::Ident(e) => &e.ident,
-                        e => unimplemented!("uncovered pattern: {:?}", e),
-                    };
+                    let ident: &Ident = arrow.path.borrow();
                     match acc.entry(ident.clone()) {
                         Entry::Vacant(e) => {
                             e.insert(Type::from_cell(&arrow.ty));
@@ -145,11 +191,7 @@ fn collect_global_idents(
                     Ok(acc)
                 }
                 ItemFrpStmt::Dependency(ref dependency) => {
-                    let ident = match &dependency.pat {
-                        Pat::Path(e) => e.borrow(),
-                        Pat::Ident(e) => &e.ident,
-                        e => unimplemented!("uncovered pattern: {:?}", e),
-                    };
+                    let ident: &Ident = dependency.path.borrow();
                     match acc.entry(ident.clone()) {
                         Entry::Vacant(e) => {
                             e.insert(Type::from_local());
@@ -198,7 +240,7 @@ fn collect_global_idents(
             let ty = &field.ty;
             match global.entry(ident.clone()) {
                 Entry::Vacant(e) => {
-                    e.insert(Type::resolved(ty));
+                    e.insert(Type::from_args(ty));
                 }
                 Entry::Occupied(_) => return Err(MultipleDefinitionError::new(ident).into()),
             }

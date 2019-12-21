@@ -3,7 +3,6 @@ use syn::Result;
 
 #[macro_use]
 mod error;
-mod codegen;
 mod deps_check;
 mod deps_trailer;
 mod tsort;
@@ -12,11 +11,11 @@ pub mod types;
 
 #[derive(Debug)]
 pub struct LfrpIR {
-    module: ast::ItemMod,
-    input: ast::ItemIn,
-    output: ast::ItemOut,
-    args: Option<ast::ItemArgs>,
-    body: deps_check::OrderedStmts,
+    pub module: ast::ItemMod,
+    pub input: ast::ItemIn,
+    pub output: ast::ItemOut,
+    pub args: Option<ast::ItemArgs>,
+    pub body: deps_check::OrderedStmts,
 }
 
 impl LfrpIR {
@@ -44,7 +43,6 @@ impl LfrpIR {
         item_unwrap!(input, "In");
         item_unwrap!(output, "Out");
 
-        // typeck::typeck(&input, &output, &args, &mut frp_stmts)?;
         let body = deps_check::deps_check(&input, &output, &args, frp_stmts)?;
 
         Ok(LfrpIR {

@@ -50,7 +50,7 @@ impl<'a> DepsTrailer<'a> for Expr {
                 e.else_branch.deps_trailer(context);
             }
             Path(e) => e.deps_trailer(context),
-            Lit(e) => {}
+            Lit(_) => {}
 
             e => unimplemented!("deps_trailer impl: {:?}", e),
         }
@@ -59,7 +59,7 @@ impl<'a> DepsTrailer<'a> for Expr {
 
 impl<'a> DepsTrailer<'a> for ExprPath {
     fn deps_trailer(&'a mut self, context: Context<'_, '_, '_, 'a>) {
-        context.insert_variable(&self.path);
+        context.insert_variable(&mut self.path);
     }
 }
 

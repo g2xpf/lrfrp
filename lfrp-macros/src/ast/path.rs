@@ -5,22 +5,46 @@ use syn::Ident;
 use syn::Result;
 use syn::Token;
 
-use quote::ToTokens;
+use crate::lfrp_ir::types;
+
+use super::types::Type;
+
+use quote::{quote, ToTokens};
 
 use proc_macro2::TokenStream;
 
 use std::borrow::Borrow;
-
-use super::types;
+use std::ptr;
 
 #[derive(Clone, Debug)]
-pub struct Path {
-    pub segment: PathSegment,
+pub enum Path {
+    Segment(PathSegment),
+    TypedSegment(PathSegment, types::Type),
+}
+
+impl Path {
+    pub fn typing(&mut self, ty: &types::Type) {
+        use Path::*;
+        let ty = ty.clone();
+        unsafe {
+            ptr::write(
+                self,
+                match ptr::read(self) {
+                    Segment(s) => TypedSegment(s, ty),
+                    TypedSegment(s, _) => TypedSegment(s, ty),
+                },
+            );
+        }
+    }
 }
 
 impl Borrow<Ident> for Path {
     fn borrow(&self) -> &Ident {
-        self.segment.borrow()
+        use Path::*;
+        match self {
+            Segment(ref segment) => segment.borrow(),
+            TypedSegment(segment, _) => segment.borrow(),
+        }
     }
 }
 
@@ -29,21 +53,41 @@ where
     T: Into<PathSegment>,
 {
     fn from(t: T) -> Self {
-        Path { segment: t.into() }
+        Path::Segment(t.into())
     }
 }
 
 impl Parse for Path {
     fn parse(input: ParseStream) -> Result<Self> {
-        Ok(Path {
-            segment: input.parse()?,
-        })
+        Ok(Path::Segment(input.parse()?))
     }
 }
 
 impl ToTokens for Path {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        self.segment.to_tokens(tokens);
+        use Path::*;
+        match self {
+            Segment(segment) => segment.to_tokens(tokens),
+            TypedSegment(segment, ty) => {
+                let ident: &Ident = segment.borrow();
+                match ty {
+                    types::Type::Mono(types::TypeMono::Type(_)) => ident.to_tokens(tokens),
+                    types::Type::Lifted(types::TypeLifted::Cell(_)) => {
+                        tokens.extend(quote! {self.cell.#ident})
+                    }
+                    types::Type::Mono(types::TypeMono::Args(_)) => {
+                        tokens.extend(quote! { self.args.#ident })
+                    }
+                    types::Type::Lifted(types::TypeLifted::Signal(ref ty)) => match ty {
+                        types::TypeSignal::Local(_) => ident.to_tokens(tokens),
+                        types::TypeSignal::Input(_) => tokens.extend(quote! { input.#ident }),
+                        types::TypeSignal::Output(_) => {
+                            tokens.extend(quote! { self.output.#ident })
+                        }
+                    },
+                }
+            }
+        }
     }
 }
 
@@ -103,7 +147,7 @@ pub enum PathArguments {
 #[derive(Clone, Debug)]
 pub struct AngleBracketedGenericArguments {
     pub lt_token: Token![<],
-    pub args: Punctuated<types::Type, Token![,]>,
+    pub args: Punctuated<Type, Token![,]>,
     pub gt_token: Token![>],
 }
 
@@ -165,7 +209,7 @@ pub struct ParenthesizedGenericArguments {
 
 #[derive(Clone, Debug)]
 pub enum GenericArgument {
-    Type(types::Type),
+    Type(Type),
     // Const(Expr),
 }
 

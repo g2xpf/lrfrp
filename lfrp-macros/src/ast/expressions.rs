@@ -1,5 +1,5 @@
 use super::custom_keywords::{delay, then};
-use super::custom_punctuations::{RevArrow, StarStar};
+use super::custom_punctuations::StarStar;
 use super::literals::Lit;
 use super::path::Path;
 use super::patterns::Pat;
@@ -75,7 +75,8 @@ pub enum Expr {
     List(ExprList),
     Type(ExprType),
 
-    // types for deps checker
+    // types for type checker
+    #[allow(dead_code)]
     TypedExpr(Box<Expr>, types::Type),
 }
 
@@ -105,19 +106,7 @@ impl ToTokens for Expr {
             Path(ref e) => e.to_tokens(tokens),
             // List(ref e),
             // Type(ref e),
-            TypedExpr(ref e, ref ty) => match ty {
-                types::Type::Mono(types::TypeMono::Type(_))
-                | types::Type::Lifted(types::TypeLifted::Cell(_)) => e.to_tokens(tokens),
-                types::Type::Mono(types::TypeMono::Args(_)) => {
-                    // assumne #e is ident
-                    tokens.extend(quote! { self.args.#e })
-                }
-                types::Type::Lifted(types::TypeLifted::Signal(ref ty)) => match ty {
-                    types::TypeSignal::Local(_) => e.to_tokens(tokens),
-                    types::TypeSignal::Input(_) => tokens.extend(quote! { self.input.#e }),
-                    types::TypeSignal::Output(_) => tokens.extend(quote! { self.output.#e }),
-                },
-            },
+            TypedExpr(ref e, ref _ty) => e.to_tokens(tokens),
             _ => unimplemented!("totokens for expr"),
         }
     }
@@ -472,7 +461,18 @@ impl Parse for ExprIf {
 }
 
 impl ToTokens for ExprIf {
-    fn to_tokens(&self, tokens: &mut TokenStream) {}
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let cond = &self.cond;
+        let then_branch = &self.then_branch;
+        let else_branch = &self.else_branch;
+        tokens.extend(quote! {
+            if #cond {
+                #then_branch
+            } else {
+                #else_branch
+            }
+        });
+    }
 }
 
 #[derive(Debug)]

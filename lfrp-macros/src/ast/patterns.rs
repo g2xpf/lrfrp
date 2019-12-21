@@ -8,7 +8,6 @@ use syn::Token;
 
 use super::literals::Lit;
 use super::path::Path;
-use super::types::Type;
 
 use std::borrow::Borrow;
 

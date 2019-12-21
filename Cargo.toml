@@ -3,6 +3,6 @@
 members = [
     "lfrp",
     "lfrp-macros",
-    "lfrp-test"
+    "lfrp-examples"
 ]
 

@@ -31,20 +31,6 @@ pub enum Item {
     FrpStmt(ItemFrpStmt),
 }
 
-impl ToTokens for Item {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        use Item::*;
-
-        match self {
-            Mod(ref e) => e.to_tokens(tokens),
-            In(ref e) => e.to_tokens(tokens),
-            Out(ref e) => e.to_tokens(tokens),
-            Args(ref e) => e.to_tokens(tokens),
-            FrpStmt(ref e) => e.to_tokens(tokens),
-        }
-    }
-}
-
 #[derive(Debug)]
 pub struct ItemMod {
     pub mod_token: Token![mod],
@@ -69,9 +55,12 @@ pub struct Field {
 
 impl ToTokens for Field {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        self.ident.to_tokens(tokens);
-        self.colon_token.to_tokens(tokens);
-        self.ty.to_tokens(tokens);
+        let ident = &self.ident;
+        let colon_token = &self.colon_token;
+        let ty = &self.ty;
+        tokens.extend(quote! {
+            pub #ident #colon_token #ty
+        });
     }
 }
 
@@ -133,6 +122,10 @@ macro_rules! impl_to_tokens_for_key {
     ($type:tt, $token_param:ident) => {
         impl ToTokens for $type {
             fn to_tokens(&self, tokens: &mut TokenStream) {
+                tokens.extend(quote! {
+                    #[derive(Debug, Clone, Default)]
+                    pub struct
+                });
                 self.$token_param.to_tokens(tokens);
                 self.braced_token.surround(tokens, |tokens| {
                     self.fields.to_tokens(tokens);
@@ -152,23 +145,12 @@ pub enum ItemFrpStmt {
     Arrow(FrpStmtArrow),
 }
 
-impl ToTokens for ItemFrpStmt {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        use ItemFrpStmt::*;
-
-        match self {
-            Dependency(ref e) => e.to_tokens(tokens),
-            Arrow(ref e) => e.to_tokens(tokens),
-        }
-    }
-}
-
 impl Parse for ItemFrpStmt {
     fn parse(input: ParseStream) -> Result<Self> {
         use ItemFrpStmt::*;
 
         let let_token = input.parse()?;
-        let pat = input.parse()?;
+        let path = input.parse()?;
         let lookahead = input.lookahead1();
         if lookahead.peek(Token![=]) {
             let eq_token = input.parse()?;
@@ -176,7 +158,7 @@ impl Parse for ItemFrpStmt {
             let semi_token = input.parse()?;
             Ok(Dependency(FrpStmtDependency {
                 let_token,
-                pat,
+                path,
                 eq_token,
                 expr,
                 semi_token,
@@ -191,7 +173,7 @@ impl Parse for ItemFrpStmt {
             let semi_token = input.parse()?;
             Ok(Arrow(FrpStmtArrow {
                 let_token,
-                pat,
+                path,
                 colon_token,
                 ty,
                 left_arrow_token,
@@ -209,7 +191,7 @@ impl Parse for ItemFrpStmt {
 #[derive(Debug)]
 pub struct FrpStmtDependency {
     pub let_token: Let,
-    pub pat: patterns::Pat,
+    pub path: path::Path,
     pub eq_token: Token![=],
     pub expr: expressions::Expr,
     pub semi_token: Token![;],
@@ -217,14 +199,28 @@ pub struct FrpStmtDependency {
 
 impl ToTokens for FrpStmtDependency {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        unimplemented!()
+        use crate::lfrp_ir::types::*;
+        match &self.path {
+            path::Path::Segment(_) => unreachable!(),
+            path::Path::TypedSegment(_, ty) => match ty {
+                Type::Mono(TypeMono::Type(_)) => unreachable!(),
+                Type::Lifted(TypeLifted::Signal(TypeSignal::Local(_))) => {
+                    self.let_token.to_tokens(tokens)
+                }
+                _ => {}
+            },
+        }
+        self.path.to_tokens(tokens);
+        self.eq_token.to_tokens(tokens);
+        self.expr.to_tokens(tokens);
+        self.semi_token.to_tokens(tokens);
     }
 }
 
 #[derive(Debug)]
 pub struct FrpStmtArrow {
     pub let_token: Let,
-    pub pat: patterns::Pat,
+    pub path: path::Path,
     pub colon_token: Token![:],
     pub ty: types::Type,
     pub left_arrow_token: Token![<-],
@@ -232,12 +228,6 @@ pub struct FrpStmtArrow {
     pub rev_arrow_token: custom_punctuations::RevArrow,
     pub expr: expressions::Expr,
     pub semi_token: Token![;],
-}
-
-impl ToTokens for FrpStmtArrow {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        unimplemented!()
-    }
 }
 
 impl Parse for Ast {

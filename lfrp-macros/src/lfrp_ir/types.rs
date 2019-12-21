@@ -8,7 +8,9 @@ use std::fmt;
 use crate::ast::types;
 use syn::{Ident, Result};
 
-#[derive(Debug)]
+use crate::ast::path::Path;
+
+#[derive(Clone, Debug)]
 pub enum Type {
     Mono(TypeMono),
     Lifted(TypeLifted),
@@ -43,12 +45,16 @@ impl Type {
         ))))
     }
 
+    pub fn from_args(ty: &types::Type) -> Self {
+        Type::Mono(TypeMono::Args(MaybeType::Resolved(Box::new(ty.clone()))))
+    }
+
     pub fn from_local() -> Self {
         Type::Lifted(TypeLifted::Signal(TypeSignal::Local(MaybeType::Unresolved)))
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum TypeMono {
     Type(MaybeType),
     Args(MaybeType),
@@ -152,12 +158,9 @@ impl<'a, 'b> TyCtx<'a, 'b> {
         self.local[self.scope - 1].insert(var.clone(), Type::unresolved());
     }
 
-    fn insert_variable<P>(&mut self, expr_path: &'b P)
-    where
-        P: Borrow<Ident>,
-    {
+    fn insert_variable(&mut self, path: &'b mut Path) {
         // search local scope
-        let key = expr_path.borrow();
+        let key = Borrow::<Ident>::borrow(path).clone();
         for scope in (0..self.scope).rev() {
             if self.local[scope].contains_key(&key) {
                 return;
@@ -168,14 +171,15 @@ impl<'a, 'b> TyCtx<'a, 'b> {
         if let Some(ty) = self.global.get(&key) {
             match ty {
                 Type::Lifted(ty) if self.forbid_lifted() => {
-                    self.push_error(LiftedTypeNotAllowedError::new(key, ty))
+                    self.push_error(LiftedTypeNotAllowedError::new(&key, ty))
                 }
                 _ => {
-                    self.deps.1.insert(key);
+                    path.typing(ty);
+                    self.deps.1.insert(Borrow::<Ident>::borrow(path));
                 }
             }
         } else {
-            self.push_error(UndefinedVariableError::new(key))
+            self.push_error(UndefinedVariableError::new(&key))
         }
     }
 
@@ -208,22 +212,12 @@ impl<'a, 'b, 'c> TyCtxRef<'a, 'b, 'c> {
         self.0.borrow_mut().insert_local(var)
     }
 
-    pub fn insert_variable<P>(&self, expr_path: &'c P)
-    where
-        P: Borrow<Ident>,
-    {
-        self.0.borrow_mut().insert_variable(expr_path)
+    pub fn insert_variable(&self, path: &'c mut Path) {
+        self.0.borrow_mut().insert_variable(path)
     }
 
     pub fn forbid_lifted(&self) -> bool {
         self.0.borrow().forbid_lifted()
-    }
-
-    pub fn push_error<E>(&mut self, e: E)
-    where
-        E: Into<syn::Error>,
-    {
-        self.0.borrow_mut().push_error(e)
     }
 }
 

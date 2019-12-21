@@ -16,3 +16,11 @@ proc-macro2 = "1.0"
 [dependencies.syn]
 version = "1.0"
 features = ["full", "extra-traits"]
+
+[[bin]]
+name = "SimFanController"
+path = "src/main.rs"
+
+[bin.dependencies]
+ansi-escapes = "*"
+
