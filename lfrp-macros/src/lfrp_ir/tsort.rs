@@ -14,7 +14,9 @@ enum SearchState {
     Searched,
 }
 
-pub fn tsort<'a>(deps: &'a HashMap<Var<'a>, HashSet<Var<'a>>>) -> Result<Vec<String>>
+pub fn tsort<'a>(
+    deps: &'a HashMap<Var<'a>, HashSet<Var<'a>>>,
+) -> Result<impl DoubleEndedIterator<Item = Var<'a>>>
 where
 {
     let mut dependencies: HashMap<Var, HashSet<Var>> = HashMap::new();
@@ -54,11 +56,7 @@ where
             Ok(acc)
         })?;
 
-    Ok(result
-        .into_iter()
-        .map(|var| var.to_string())
-        .rev()
-        .collect())
+    Ok(result.into_iter())
 }
 
 fn dfs<'a>(

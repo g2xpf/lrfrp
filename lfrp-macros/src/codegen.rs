@@ -26,7 +26,7 @@ pub fn codegen(lfrp_ir: LfrpIR) -> TokenStream {
     });
 
     let cell_definition = body.cell_definition();
-    let calculations = body.calculations();
+    let calculations = &body.dependencies;
 
     let cell_initializations = body.cell_initializations();
     let cell_updates = body.cell_updates();
@@ -72,7 +72,7 @@ pub fn codegen(lfrp_ir: LfrpIR) -> TokenStream {
 
                 pub fn run(&mut self, input: &In) {
                     self.running |= true;
-                    #calculations
+                    #(#calculations)*
                     #cell_updates
                 }
             }

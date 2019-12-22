@@ -11,20 +11,34 @@ use syn::{Ident, Result};
 
 use proc_macro2::TokenStream;
 
-use quote::{quote, ToTokens};
+use quote::quote;
 
 use std::collections::hash_map::Entry;
 
 #[derive(Debug)]
 pub struct OrderedStmts {
-    dependencies: Vec<FrpStmtDependency>,
-    arrows: HashMap<String, FrpStmtArrow>,
+    pub dependencies: Vec<FrpStmtDependency>,
+    pub arrows: Vec<FrpStmtArrow>,
+}
+
+struct VarDependency<'a> {
+    pub dependencies: HashMap<Var<'a>, HashSet<Var<'a>>>,
+    pub arrows: HashMap<Var<'a>, HashSet<Var<'a>>>,
+}
+
+impl<'a> VarDependency<'a> {
+    fn new() -> Self {
+        VarDependency {
+            dependencies: HashMap::new(),
+            arrows: HashMap::new(),
+        }
+    }
 }
 
 impl OrderedStmts {
     pub fn cell_definition(&self) -> TokenStream {
         let mut fields = TokenStream::new();
-        for (_, arrow) in self.arrows.iter() {
+        for arrow in self.arrows.iter() {
             let ident: &Ident = &arrow.path.borrow();
             let colon_token = &arrow.colon_token;
             let ty = &arrow.ty;
@@ -42,17 +56,9 @@ impl OrderedStmts {
         }
     }
 
-    pub fn calculations(&self) -> TokenStream {
-        let mut calculations = TokenStream::new();
-        self.dependencies.iter().for_each(|dep| {
-            dep.to_tokens(&mut calculations);
-        });
-        calculations
-    }
-
     pub fn cell_updates(&self) -> TokenStream {
         let mut cell_updates = TokenStream::new();
-        for (_, arrow) in self.arrows.iter() {
+        for arrow in self.arrows.iter() {
             let path = &arrow.path;
             let expr = &arrow.expr;
             cell_updates.extend(quote! {
@@ -65,7 +71,7 @@ impl OrderedStmts {
 
     pub fn cell_initializations(&self) -> TokenStream {
         let mut cell_initializations = TokenStream::new();
-        for (_, arrow) in self.arrows.iter() {
+        for arrow in self.arrows.iter() {
             let path = &arrow.path;
             let expr = &arrow.arrow_expr.expr;
             cell_initializations.extend(quote! {
@@ -87,7 +93,14 @@ pub fn deps_check(
         let global = collect_global_idents(&input, &output, &args, &frp_stmts)?;
 
         let deps = extract_deps(&global, &mut frp_stmts)?;
-        tsort::tsort(&deps)?
+        let sorted_dependencies = tsort::tsort(&deps.dependencies)?
+            .map(|ident| ident.to_string())
+            .rev()
+            .collect();
+        let sorted_arrows = tsort::tsort(&deps.arrows)?
+            .map(|ident| ident.to_string())
+            .collect();
+        (sorted_dependencies, sorted_arrows)
     };
 
     Ok(generate_ordered_stmts(frp_stmts, calculation_order))
@@ -95,26 +108,33 @@ pub fn deps_check(
 
 fn generate_ordered_stmts(
     frp_stmts: Vec<ItemFrpStmt>,
-    calculation_order: Vec<String>,
+    calculation_order: (Vec<String>, Vec<String>),
 ) -> OrderedStmts {
-    let mut stmt_map = HashMap::new();
+    let mut deps_map = HashMap::new();
+    let mut arrows_map = HashMap::new();
     let mut dependencies = vec![];
-    let mut arrows = HashMap::new();
+    let mut arrows = vec![];
 
     frp_stmts.into_iter().for_each(|frp_stmt| match frp_stmt {
         ItemFrpStmt::Dependency(dep) => {
-            let ident: &Ident = &dep.path.borrow();
-            stmt_map.insert(ident.to_string(), dep);
+            let ident: &Ident = dep.path.borrow();
+            deps_map.insert(ident.to_string(), dep);
         }
         ItemFrpStmt::Arrow(arrow) => {
             let ident: &Ident = arrow.path.borrow();
-            arrows.insert(ident.to_string(), arrow);
+            arrows_map.insert(ident.to_string(), arrow);
         }
     });
 
-    calculation_order.iter().for_each(|s| {
-        if let Some(frp_stmt) = stmt_map.remove(s) {
+    calculation_order.0.iter().for_each(|s| {
+        if let Some(frp_stmt) = deps_map.remove(s) {
             dependencies.push(frp_stmt);
+        }
+    });
+
+    calculation_order.1.iter().for_each(|s| {
+        if let Some(frp_stmt) = arrows_map.remove(s) {
+            arrows.push(frp_stmt);
         }
     });
 
@@ -127,10 +147,10 @@ fn generate_ordered_stmts(
 fn extract_deps<'a, 'b>(
     global: &'a VarEnv,
     frp_stmts: &'b mut Vec<ItemFrpStmt>,
-) -> Result<HashMap<Var<'b>, HashSet<Var<'b>>>> {
+) -> Result<VarDependency<'b>> {
     frp_stmts
         .iter_mut()
-        .try_fold(HashMap::new(), |mut acc, frp_stmt| {
+        .try_fold(VarDependency::new(), |mut acc, frp_stmt| {
             let e = match frp_stmt {
                 ItemFrpStmt::Dependency(FrpStmtDependency {
                     ref mut path,
@@ -143,8 +163,8 @@ fn extract_deps<'a, 'b>(
                     }
                     let ident = Borrow::<Ident>::borrow(path);
                     let extractor = DepExtractor::new(global, ident);
-                    let (lhs, dep) = extractor.extract(expr, false)?;
-                    acc.insert(ident, dep);
+                    let (_, dep) = extractor.extract(expr, false)?;
+                    acc.dependencies.insert(ident, dep);
                     Ok(acc)
                 }
                 ItemFrpStmt::Arrow(FrpStmtArrow {
@@ -160,7 +180,8 @@ fn extract_deps<'a, 'b>(
                     extractor.extract(arrow_expr, true)?;
 
                     let extractor = DepExtractor::new(global, ident);
-                    extractor.extract(expr, false)?;
+                    let (_, dep) = extractor.extract(expr, false)?;
+                    acc.arrows.insert(ident, dep);
                     Ok(acc)
                 }
             };
