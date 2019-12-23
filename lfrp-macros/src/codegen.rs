@@ -48,6 +48,7 @@ pub fn codegen(lfrp_ir: LfrpIR) -> TokenStream {
             }
 
             impl FRP {
+                #[inline]
                 pub fn new(#args_field) -> Self {
                     FRP {
                         running: false,
@@ -57,12 +58,14 @@ pub fn codegen(lfrp_ir: LfrpIR) -> TokenStream {
                     }.cell_initializations()
                 }
 
+                #[inline]
                 fn cell_initializations(mut self) -> Self {
                     #cell_initializations
                     self
                 }
 
-                pub fn sample(&self) -> Option<&Out> {
+                #[inline]
+                pub fn sample(&self) -> ::core::option::Option<&Out> {
                     if self.running {
                         Some(&self.output)
                     } else {
