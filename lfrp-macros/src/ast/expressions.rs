@@ -523,7 +523,7 @@ impl Parse for ExprBlock {
                     if content.is_empty() {
                         break;
                     } else if is_final_stmt {
-                        return Err(content.error("unexpected"));
+                        return Err(content.error("unexpected token"));
                     }
                 }
                 stmts
@@ -585,7 +585,7 @@ impl ToTokens for ExprBinary {
         match op {
             BinOp::Pow(_) => {
                 tokens.extend(quote! {
-                    (#lhs as f32).lpow(#rhs as f32)
+                    (#lhs as f32).powf(#rhs as f32)
                 });
             }
             _ => {

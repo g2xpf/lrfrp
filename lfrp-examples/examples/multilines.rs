@@ -9,27 +9,46 @@ use std::time::Duration;
 frp! {
     mod MultiDelays;
 
+    Args {
+        a1: f32,
+        a2: f32,
+    }
+
     In {
-        input: i32,
+        input: f32,
     }
 
     Out {
-        output: i32,
+        output: f32,
     }
 
-    let output = 2 + -{
-        let p1 = input + 1;
-        let p2 = p1 + input;
+    let output = 2.0 + -{
+        let p1 = input + 1.0;
+        let p2 = p1 + {
+            let a2 = 3.0;
+            input + c1 * a2 ** a2
+        };
         p2
+    };
+
+    let c1 = {
+        let p1 = input + 1.0;
+        let p2 = input + {
+            p1 + a1
+        };
+        {
+            p2 + 1.0
+        }
     };
 }
 
 fn main() {
-    let mut frp = MultiDelays::FRP::new();
-    let mut input = MultiDelays::In { input: 0 };
+    let args = MultiDelays::Args { a1: 10.0, a2: 3.0 };
+    let mut frp = MultiDelays::FRP::new(args);
+    let mut input = MultiDelays::In { input: 0.0 };
 
     for i in 0.. {
-        input.input = i;
+        input.input = i as f32;
         frp.run(&input);
         let output = frp.sample().unwrap();
 
