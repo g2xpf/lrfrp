@@ -3,7 +3,6 @@ use super::custom_punctuations::StarStar;
 use super::literals::Lit;
 use super::path::Path;
 use super::patterns::Pat;
-use super::statements::AllowNoSemi;
 use super::statements::Stmt;
 use super::types::Type;
 
@@ -510,11 +509,18 @@ impl Parse for ExprBlock {
                     if content.is_empty() {
                         break;
                     }
-                    // No expressions require semicolon in order to be a statement
-                    let stmt = Stmt::parse_stmt(&content, AllowNoSemi(true))?;
+                    // No expressions require semicolon in order to be statements
+                    let stmt = Stmt::parse_stmt(&content)?;
+                    let is_final_stmt = if let Stmt::Expr(_) = &stmt {
+                        true
+                    } else {
+                        false
+                    };
                     stmts.push(stmt);
-                    if input.is_empty() {
+                    if content.is_empty() {
                         break;
+                    } else if is_final_stmt {
+                        return Err(content.error("unexpected"));
                     }
                 }
                 stmts

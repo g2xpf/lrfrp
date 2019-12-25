@@ -8,32 +8,27 @@ use syn::token::{Eq, Let};
 use syn::Result;
 use syn::Token;
 
-#[derive(Copy, Clone)]
-pub struct AllowNoSemi(pub bool);
-impl Deref for AllowNoSemi {
-    type Target = bool;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
 #[allow(dead_code)]
 #[derive(Debug)]
 pub enum Stmt {
     Local(StmtLocal),
-    Expr(StmtExpr),
-    Semi(StmtSemi),
+    Expr(Expr),
 }
 
 impl Stmt {
-    pub fn parse_stmt(_input: ParseStream, _allow_nosemi: AllowNoSemi) -> Result<Self> {
-        unimplemented!("parse_stmt(input: ParseStream, allow_nosemi: AllowNoSemi)")
+    pub fn parse_stmt(input: ParseStream) -> Result<Self> {
+        use Stmt::*;
+        if input.peek(Token![let]) {
+            input.parse().map(Local)
+        } else {
+            input.parse().map(Expr)
+        }
     }
 }
 
 impl Parse for Stmt {
     fn parse(input: ParseStream) -> Result<Self> {
-        Stmt::parse_stmt(input, AllowNoSemi(true))
+        Stmt::parse_stmt(input)
     }
 }
 
@@ -46,13 +41,14 @@ pub struct StmtLocal {
     pub semi_token: Token![;],
 }
 
-#[derive(Debug)]
-pub struct StmtExpr {
-    pub expr: Expr,
-}
-
-#[derive(Debug)]
-pub struct StmtSemi {
-    pub expr: Expr,
-    pub semi_token: Token![;],
+impl Parse for StmtLocal {
+    fn parse(input: ParseStream) -> Result<Self> {
+        Ok(StmtLocal {
+            let_token: input.parse()?,
+            pat: input.parse()?,
+            eq_token: input.parse()?,
+            expr: Box::new(input.parse()?),
+            semi_token: input.parse()?,
+        })
+    }
 }
