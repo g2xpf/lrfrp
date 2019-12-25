@@ -236,7 +236,7 @@ fn collect_global_idents(
                     *untyped = Type::from_output(ty);
                     Ok(())
                 }
-                Entry::Vacant(e) => Err(NotCalculatedError::new(ident).into()),
+                Entry::Vacant(_) => Err(NotCalculatedError::new(ident).into()),
             }
         })?;
 

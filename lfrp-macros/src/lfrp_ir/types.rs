@@ -9,6 +9,7 @@ use crate::ast::types;
 use syn::{Ident, Result};
 
 use crate::ast::path::Path;
+use crate::ast::patterns::Pat;
 
 #[derive(Clone, Debug)]
 pub enum Type {
@@ -154,8 +155,20 @@ impl<'a, 'b> TyCtx<'a, 'b> {
         self.forbid_lifted
     }
 
-    fn insert_local(&mut self, var: Var<'b>) {
-        self.local[self.scope - 1].insert(var.clone(), Type::unresolved());
+    fn insert_local(&mut self, pat: &'b mut Pat) {
+        use Pat::*;
+        let current_local = &mut self.local[self.scope - 1];
+        match pat {
+            Wild(_) => {}
+            Ident(p) => {
+                let ident = p.ident.clone();
+                current_local.insert(ident, Type::unresolved());
+                if let Some((_, pat)) = &mut p.subpat {
+                    self.insert_local(pat);
+                }
+            }
+            _ => unimplemented!("insert local for pat"),
+        }
     }
 
     fn insert_variable(&mut self, path: &'b mut Path) {
@@ -208,8 +221,12 @@ impl<'a, 'b, 'c> TyCtxRef<'a, 'b, 'c> {
         TyCtxRef(tcx)
     }
 
-    pub fn insert_local(&self, var: Var<'c>) {
-        self.0.borrow_mut().insert_local(var)
+    pub fn scoped(&self) {
+        self.0.borrow_mut().scoped();
+    }
+
+    pub fn insert_local(&self, pat: &'c mut Pat) {
+        self.0.borrow_mut().insert_local(pat)
     }
 
     pub fn insert_variable(&self, path: &'c mut Path) {

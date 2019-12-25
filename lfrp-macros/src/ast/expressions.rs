@@ -89,23 +89,26 @@ impl ToTokens for Expr {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         use Expr::*;
         match self {
-            Unary(ref e) => e.to_tokens(tokens),
-            Binary(ref e) => e.to_tokens(tokens),
+            Unary(e) => e.to_tokens(tokens),
+            Binary(e) => e.to_tokens(tokens),
             // Block(ref e),
             // Call(ref e),
             // Field(ref e),
             // Cast(ref e),
-            If(ref e) => e.to_tokens(tokens),
+            If(e) => e.to_tokens(tokens),
             // Index(ref e),
-            Lit(ref e) => e.to_tokens(tokens),
+            Lit(e) => e.to_tokens(tokens),
             // Match(ref e),
-            Paren(ref e) => e.to_tokens(tokens),
+            Paren(e) => e.to_tokens(tokens),
             // Struct(ref e),
             // Tuple(ref e),
-            Path(ref e) => e.to_tokens(tokens),
+            Path(e) => e.to_tokens(tokens),
             // List(ref e),
             // Type(ref e),
-            TypedExpr(ref e, ref _ty) => e.to_tokens(tokens),
+            TypedExpr(e, _) => e.to_tokens(tokens),
+
+            Block(e) => e.to_tokens(tokens),
+
             _ => unimplemented!("totokens for expr"),
         }
     }
@@ -490,8 +493,8 @@ pub struct ExprType {
 
 #[derive(Debug)]
 pub struct ExprBlock {
-    braced_token: Brace,
-    stmts: Vec<Stmt>,
+    pub braced_token: Brace,
+    pub stmts: Vec<Stmt>,
 }
 
 impl Parse for ExprBlock {
@@ -526,6 +529,14 @@ impl Parse for ExprBlock {
                 stmts
             },
         })
+    }
+}
+
+impl ToTokens for ExprBlock {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.braced_token.surround(tokens, |tokens| {
+            self.stmts.iter().for_each(|stmt| stmt.to_tokens(tokens));
+        });
     }
 }
 

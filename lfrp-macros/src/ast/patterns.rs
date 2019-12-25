@@ -9,6 +9,9 @@ use syn::Token;
 use super::literals::Lit;
 use super::path::Path;
 
+use proc_macro2::TokenStream;
+use quote::ToTokens;
+
 use std::borrow::Borrow;
 
 #[allow(dead_code)]
@@ -47,6 +50,17 @@ impl Parse for Pat {
     }
 }
 
+impl ToTokens for Pat {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        use Pat::*;
+        match self {
+            Wild(p) => p.to_tokens(tokens),
+            Ident(p) => p.to_tokens(tokens),
+            _ => unimplemented!("to_tokens for Pat"),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct PatWild {
     pub underscore_token: Underscore,
@@ -56,6 +70,12 @@ impl Parse for PatWild {
     fn parse(input: ParseStream) -> Result<Self> {
         let underscore_token = input.parse()?;
         Ok(PatWild { underscore_token })
+    }
+}
+
+impl ToTokens for PatWild {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.underscore_token.to_tokens(tokens);
     }
 }
 
@@ -79,6 +99,16 @@ impl Parse for PatIdent {
                 }
             },
         })
+    }
+}
+
+impl ToTokens for PatIdent {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.ident.to_tokens(tokens);
+        if let Some((at_token, pat)) = &self.subpat {
+            at_token.to_tokens(tokens);
+            pat.to_tokens(tokens);
+        }
     }
 }
 

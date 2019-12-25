@@ -1,3 +1,6 @@
+#[cfg(feature = "print_codegen")]
+extern crate rustfmt;
+
 use super::lfrp_ir::LfrpIR;
 use proc_macro::TokenStream;
 use quote::quote;
@@ -82,5 +85,24 @@ pub fn codegen(lfrp_ir: LfrpIR) -> TokenStream {
         }
     };
 
+    #[cfg(feature = "print-codegen")]
+    print_codegen(&token_stream);
+
     token_stream.into()
+}
+
+#[cfg(feature = "print-codegen")]
+fn print_codegen(token_stream: &proc_macro2::TokenStream) {
+    use ::rustfmt::config::Config;
+    use ::rustfmt::Input;
+    use std::io;
+
+    let input = Input::Text(token_stream.to_string());
+    let mut output = io::stderr();
+    let res = rustfmt::format_input(input, &Config::default(), Some(&mut output));
+    if let Ok((_, file_map, _)) = res {
+        eprintln!(r#"{}"#, file_map[0].1);
+    } else {
+        eprintln!("formatting generated codes failed");
+    }
 }

@@ -3,8 +3,8 @@ extern crate proc_macro;
 mod ast;
 mod codegen;
 mod lfrp_ir;
+
 use lfrp_ir::LfrpIR;
-// mod program;
 
 use proc_macro::TokenStream;
 use syn::parse_macro_input;

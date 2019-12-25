@@ -1,5 +1,6 @@
 use super::types::{Dependency, TyCtx, TyCtxRef, Var, VarEnv};
-use crate::ast::expressions::{ArrowExpr, Expr, ExprPath};
+use crate::ast::expressions::{ArrowExpr, Expr, ExprBlock, ExprPath};
+use crate::ast::statements::Stmt;
 use std::cell::RefCell;
 use syn::Result;
 
@@ -52,6 +53,8 @@ impl<'a> DepsTrailer<'a> for Expr {
             Path(e) => e.deps_trailer(context),
             Lit(_) => {}
 
+            Block(e) => e.deps_trailer(context),
+
             e => unimplemented!("deps_trailer impl: {:?}", e),
         }
     }
@@ -66,5 +69,20 @@ impl<'a> DepsTrailer<'a> for ExprPath {
 impl<'a> DepsTrailer<'a> for ArrowExpr {
     fn deps_trailer(&'a mut self, context: Context<'_, '_, '_, 'a>) {
         self.expr.deps_trailer(context)
+    }
+}
+
+impl<'a> DepsTrailer<'a> for ExprBlock {
+    fn deps_trailer(&'a mut self, context: Context<'_, '_, '_, 'a>) {
+        context.scoped();
+        for stmt in self.stmts.iter_mut() {
+            match stmt {
+                Stmt::Local(e) => {
+                    e.expr.deps_trailer(context);
+                    context.insert_local(&mut e.pat);
+                }
+                Stmt::Expr(e) => e.deps_trailer(context),
+            }
+        }
     }
 }
