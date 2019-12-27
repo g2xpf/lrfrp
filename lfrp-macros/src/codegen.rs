@@ -11,6 +11,7 @@ pub fn codegen(lfrp_ir: LfrpIR) -> TokenStream {
         input,
         output,
         args,
+        declarations,
         body,
     } = lfrp_ir;
 
@@ -37,6 +38,8 @@ pub fn codegen(lfrp_ir: LfrpIR) -> TokenStream {
     let token_stream = quote! {
         #[allow(non_snake_case)]
         mod #module_name {
+            #(#declarations)*
+
             #input
             #output
             #args

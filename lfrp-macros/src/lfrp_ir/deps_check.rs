@@ -6,7 +6,9 @@ use super::types::{Type, Var, VarEnv};
 use std::borrow::Borrow;
 use std::collections::{HashMap, HashSet};
 
-use crate::ast::{Field, FrpStmtArrow, FrpStmtDependency, ItemArgs, ItemFrpStmt, ItemIn, ItemOut};
+use crate::ast::{
+    Declaration, Field, FrpStmtArrow, FrpStmtDependency, ItemArgs, ItemFrpStmt, ItemIn, ItemOut,
+};
 use syn::{Ident, Result};
 
 use proc_macro2::TokenStream;
@@ -86,13 +88,14 @@ pub fn deps_check(
     input: &ItemIn,
     output: &ItemOut,
     args: &Option<ItemArgs>,
+    mut declarations: Vec<Declaration>,
     mut frp_stmts: Vec<ItemFrpStmt>,
-) -> Result<OrderedStmts> {
+) -> Result<(Vec<Declaration>, OrderedStmts)> {
     // collect identifiers of global let-bindings
     let calculation_order = {
-        let global = collect_global_idents(&input, &output, &args, &frp_stmts)?;
+        let global = collect_global_idents(&input, &output, &args, &declarations, &frp_stmts)?;
 
-        let deps = extract_deps(&global, &mut frp_stmts)?;
+        let deps = extract_deps(&global, &mut declarations, &mut frp_stmts)?;
         let sorted_dependencies = tsort::tsort(&deps.dependencies)?
             .map(|ident| ident.to_string())
             .rev()
@@ -103,7 +106,10 @@ pub fn deps_check(
         (sorted_dependencies, sorted_arrows)
     };
 
-    Ok(generate_ordered_stmts(frp_stmts, calculation_order))
+    Ok((
+        declarations,
+        generate_ordered_stmts(frp_stmts, calculation_order),
+    ))
 }
 
 fn generate_ordered_stmts(
@@ -146,46 +152,58 @@ fn generate_ordered_stmts(
 
 fn extract_deps<'a, 'b>(
     global: &'a VarEnv,
+    declarations: &'b mut Vec<Declaration>,
     frp_stmts: &'b mut Vec<ItemFrpStmt>,
 ) -> Result<VarDependency<'b>> {
+    declarations
+        .iter_mut()
+        .try_for_each::<_, Result<_>>(|declaration| {
+            use Declaration::*;
+            match declaration {
+                Struct(_) => unimplemented!("extract_deps case"),
+                Enum(_) => unimplemented!("extract_deps case"),
+                Fn(e) => {
+                    let extractor = DepExtractor::new(global);
+                    extractor.extract(e, true)?;
+                    Ok(())
+                }
+            }
+        })?;
     frp_stmts
         .iter_mut()
-        .try_fold(VarDependency::new(), |mut acc, frp_stmt| {
-            let e = match frp_stmt {
-                ItemFrpStmt::Dependency(FrpStmtDependency {
-                    ref mut path,
-                    ref mut expr,
-                    ..
-                }) => {
-                    let ty = global.get(Borrow::<Ident>::borrow(path));
-                    if let Some(ty) = ty {
-                        path.typing(ty);
-                    }
-                    let ident = Borrow::<Ident>::borrow(path);
-                    let extractor = DepExtractor::new(global, ident);
-                    let (_, dep) = extractor.extract(expr, false)?;
-                    acc.dependencies.insert(ident, dep);
-                    Ok(acc)
+        .try_fold(VarDependency::new(), |mut acc, frp_stmt| match frp_stmt {
+            ItemFrpStmt::Dependency(FrpStmtDependency {
+                ref mut path,
+                ref mut expr,
+                ..
+            }) => {
+                let ty = global.get(Borrow::<Ident>::borrow(path));
+                if let Some(ty) = ty {
+                    path.typing(ty);
                 }
-                ItemFrpStmt::Arrow(FrpStmtArrow {
-                    ref mut path,
-                    ty,
-                    ref mut arrow_expr,
-                    ref mut expr,
-                    ..
-                }) => {
-                    path.typing(&Type::from_cell(ty));
-                    let ident: &Ident = Borrow::<Ident>::borrow(path);
-                    let extractor = DepExtractor::new(global, ident);
-                    extractor.extract(arrow_expr, true)?;
+                let ident = Borrow::<Ident>::borrow(path);
+                let extractor = DepExtractor::new(global);
+                let dep = extractor.extract(expr, false)?;
+                acc.dependencies.insert(ident, dep);
+                Ok(acc)
+            }
+            ItemFrpStmt::Arrow(FrpStmtArrow {
+                ref mut path,
+                ty,
+                ref mut arrow_expr,
+                ref mut expr,
+                ..
+            }) => {
+                path.typing(&Type::from_cell(ty));
+                let ident: &Ident = Borrow::<Ident>::borrow(path);
+                let extractor = DepExtractor::new(global);
+                extractor.extract(arrow_expr, true)?;
 
-                    let extractor = DepExtractor::new(global, ident);
-                    let (_, dep) = extractor.extract(expr, false)?;
-                    acc.arrows.insert(ident, dep);
-                    Ok(acc)
-                }
-            };
-            e
+                let extractor = DepExtractor::new(global);
+                let dep = extractor.extract(expr, false)?;
+                acc.arrows.insert(ident, dep);
+                Ok(acc)
+            }
         })
 }
 
@@ -193,6 +211,7 @@ fn collect_global_idents(
     input: &ItemIn,
     output: &ItemOut,
     args: &Option<ItemArgs>,
+    declarations: &Vec<Declaration>,
     frp_stmts: &Vec<ItemFrpStmt>,
 ) -> Result<VarEnv> {
     let mut global =
@@ -224,6 +243,27 @@ fn collect_global_idents(
                     Ok(acc)
                 }
             })?;
+
+    // register declarations
+    declarations
+        .into_iter()
+        .try_for_each::<_, Result<_>>(|declaration| {
+            use Declaration::*;
+            match declaration {
+                Struct(e) => unimplemented!("struct pattern"),
+                Enum(e) => unimplemented!("enum pattern"),
+                Fn(e) => {
+                    let ident = &e.ident;
+                    match global.entry(ident.clone()) {
+                        Entry::Vacant(e) => {
+                            e.insert(Type::from_local());
+                            Ok(())
+                        }
+                        Entry::Occupied(_) => Err(MultipleDefinitionError::new(ident).into()),
+                    }
+                }
+            }
+        })?;
 
     // ensures all the outputs will be calculated
     output

@@ -15,6 +15,7 @@ pub struct LfrpIR {
     pub input: ast::ItemIn,
     pub output: ast::ItemOut,
     pub args: Option<ast::ItemArgs>,
+    pub declarations: Vec<ast::Declaration>,
     pub body: deps_check::OrderedStmts,
 }
 
@@ -25,17 +26,18 @@ impl LfrpIR {
         let mut output = None;
         let mut args = None;
 
+        let mut declarations = vec![];
         let mut frp_stmts = vec![];
 
         for item in ast.items.into_iter() {
             use Item::*;
-
             match item {
                 Mod(e) => try_write!(e => module),
                 In(e) => try_write!(e => input),
                 Out(e) => try_write!(e => output),
                 Args(e) => try_write!(e => args),
                 FrpStmt(e) => frp_stmts.push(e),
+                Declaration(e) => declarations.push(e),
             }
         }
 
@@ -43,13 +45,15 @@ impl LfrpIR {
         item_unwrap!(input, "In");
         item_unwrap!(output, "Out");
 
-        let body = deps_check::deps_check(&input, &output, &args, frp_stmts)?;
+        let (declarations, body) =
+            deps_check::deps_check(&input, &output, &args, declarations, frp_stmts)?;
 
         Ok(LfrpIR {
             module,
             input,
             output,
             args,
+            declarations,
             body,
         })
     }

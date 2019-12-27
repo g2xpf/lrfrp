@@ -1,27 +1,29 @@
-use super::types::{Dependency, TyCtx, TyCtxRef, Var, VarEnv};
-use crate::ast::expressions::{ArrowExpr, Expr, ExprBlock, ExprPath};
+use super::types::{Dependency, TyCtx, TyCtxRef, VarEnv};
+use crate::ast::expressions::{ArrowExpr, Expr, ExprBlock, ExprCall, ExprPath};
 use crate::ast::statements::Stmt;
+use crate::ast::ItemFn;
 use std::cell::RefCell;
+use std::ops::DerefMut;
+use syn::punctuated::Punctuated;
 use syn::Result;
 
 pub type Context<'a, 'b, 'c, 'd> = &'a TyCtxRef<'b, 'c, 'd>;
 
-pub struct DepExtractor<'a, 'b> {
+pub struct DepExtractor<'a> {
     global: &'a VarEnv,
-    lhs: Var<'b>,
 }
 
-impl<'a, 'b> DepExtractor<'a, 'b> {
-    pub fn new(global: &'a VarEnv, lhs: Var<'b>) -> Self {
-        DepExtractor { global, lhs }
+impl<'a> DepExtractor<'a> {
+    pub fn new(global: &'a VarEnv) -> Self {
+        DepExtractor { global }
     }
 
-    pub fn extract<T: DepsTrailer<'b>>(
+    pub fn extract<'b, T: DepsTrailer<'b>>(
         &self,
         t: &'b mut T,
         forbid_lifted: bool,
     ) -> Result<Dependency<'b>> {
-        let tcx = TyCtx::new(&self.global, &self.lhs, forbid_lifted);
+        let tcx = TyCtx::new(&self.global, forbid_lifted);
         let tcx_cell = RefCell::new(tcx);
         {
             let tcx_ref = TyCtxRef::new(&tcx_cell);
@@ -33,6 +35,26 @@ impl<'a, 'b> DepExtractor<'a, 'b> {
 
 pub trait DepsTrailer<'a> {
     fn deps_trailer(&'a mut self, context: Context<'_, '_, '_, 'a>);
+}
+
+impl<'a, T> DepsTrailer<'a> for Box<T>
+where
+    T: DepsTrailer<'a>,
+{
+    fn deps_trailer(&'a mut self, context: Context<'_, '_, '_, 'a>) {
+        self.deref_mut().deps_trailer(context);
+    }
+}
+
+impl<'a, T, P> DepsTrailer<'a> for Punctuated<T, P>
+where
+    T: DepsTrailer<'a>,
+{
+    fn deps_trailer(&'a mut self, context: Context<'_, '_, '_, 'a>) {
+        self.iter_mut().for_each(|t| {
+            t.deps_trailer(context);
+        })
+    }
 }
 
 impl<'a> DepsTrailer<'a> for Expr {
@@ -55,8 +77,17 @@ impl<'a> DepsTrailer<'a> for Expr {
 
             Block(e) => e.deps_trailer(context),
 
+            Call(e) => e.deps_trailer(context),
+
             e => unimplemented!("deps_trailer impl: {:?}", e),
         }
+    }
+}
+
+impl<'a> DepsTrailer<'a> for ExprCall {
+    fn deps_trailer(&'a mut self, context: Context<'_, '_, '_, 'a>) {
+        context.insert_variable(&mut self.func.path);
+        self.args.deps_trailer(context);
     }
 }
 
@@ -84,5 +115,15 @@ impl<'a> DepsTrailer<'a> for ExprBlock {
                 Stmt::Expr(e) => e.deps_trailer(context),
             }
         }
+    }
+}
+
+impl<'a> DepsTrailer<'a> for ItemFn {
+    fn deps_trailer(&'a mut self, context: Context<'_, '_, '_, 'a>) {
+        context.scoped();
+        for input in self.inputs.iter_mut() {
+            context.insert_local(&mut input.pat);
+        }
+        self.expr.deps_trailer(context);
     }
 }

@@ -92,7 +92,7 @@ impl ToTokens for Expr {
             Unary(e) => e.to_tokens(tokens),
             Binary(e) => e.to_tokens(tokens),
             // Block(ref e),
-            // Call(ref e),
+            Call(e) => e.to_tokens(tokens),
             // Field(ref e),
             // Cast(ref e),
             If(e) => e.to_tokens(tokens),
@@ -141,7 +141,7 @@ fn atom_expr(input: ParseStream, allow_struct: AllowStruct) -> Result<Expr> {
     } else if input.peek(delay) || input.peek(then) {
         Err(input.error("keywords are not allowed"))
     } else if input.peek(Ident) {
-        path_or_struct(input, allow_struct)
+        path_or_struct_or_fn(input, allow_struct)
     } else if input.peek(Paren) {
         paren_or_tuple(input)
     } else if input.peek(Bracket) {
@@ -157,7 +157,7 @@ fn atom_expr(input: ParseStream, allow_struct: AllowStruct) -> Result<Expr> {
     }
 }
 
-fn path_or_struct(input: ParseStream, allow_struct: AllowStruct) -> Result<Expr> {
+fn path_or_struct_or_fn(input: ParseStream, allow_struct: AllowStruct) -> Result<Expr> {
     let path: ExprPath = input.parse()?;
     if *allow_struct && input.peek(Brace) {
         let content;
@@ -190,6 +190,13 @@ fn path_or_struct(input: ParseStream, allow_struct: AllowStruct) -> Result<Expr>
             fields,
             dot2_token,
             rest,
+        }))
+    } else if input.peek(Paren) {
+        let content;
+        Ok(Expr::Call(ExprCall {
+            func: path,
+            paren_token: parenthesized!(content in input),
+            args: content.parse_terminated(Expr::parse)?,
         }))
     } else {
         Ok(Expr::Path(path))
@@ -230,14 +237,7 @@ fn paren_or_tuple(input: ParseStream) -> Result<Expr> {
 
 fn trailer_helper(input: ParseStream, mut e: Expr) -> Result<Expr> {
     loop {
-        if input.peek(Paren) {
-            let content;
-            e = Expr::Call(ExprCall {
-                func: Box::new(e),
-                paren_token: parenthesized!(content in input),
-                args: content.parse_terminated(Expr::parse)?,
-            });
-        } else if input.peek(Token![.]) && input.peek(Token![..]) {
+        if input.peek(Token![.]) && input.peek(Token![..]) {
             let dot_token = input.parse()?;
             let member = input.parse()?;
             e = Expr::Field(ExprField {
@@ -644,9 +644,18 @@ impl Parse for ExprList {
 
 #[derive(Debug)]
 pub struct ExprCall {
-    pub func: Box<Expr>,
+    pub func: ExprPath,
     pub paren_token: Paren,
     pub args: Punctuated<Expr, Comma>,
+}
+
+impl ToTokens for ExprCall {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.func.to_tokens(tokens);
+        self.paren_token.surround(tokens, |tokens| {
+            self.args.to_tokens(tokens);
+        });
+    }
 }
 
 #[derive(Debug)]

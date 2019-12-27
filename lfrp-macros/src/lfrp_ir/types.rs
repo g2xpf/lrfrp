@@ -112,7 +112,7 @@ impl fmt::Display for MaybeType {
 }
 
 pub type Var<'a> = &'a Ident;
-pub type Dependency<'a> = (Var<'a>, HashSet<Var<'a>>);
+pub type Dependency<'a> = HashSet<Var<'a>>;
 pub type VarEnv = HashMap<Ident, Type>;
 
 pub struct TyCtx<'a, 'b> {
@@ -125,12 +125,12 @@ pub struct TyCtx<'a, 'b> {
 }
 
 impl<'a, 'b> TyCtx<'a, 'b> {
-    pub fn new(global: &'a VarEnv, lhs: Var<'b>, forbid_lifted: bool) -> Self {
+    pub fn new(global: &'a VarEnv, forbid_lifted: bool) -> Self {
         let mut ty_ctx = TyCtx {
             global,
             scope: 0,
             local: vec![],
-            deps: (lhs, HashSet::new()),
+            deps: Dependency::new(),
             errors: vec![],
             forbid_lifted,
         };
@@ -188,7 +188,7 @@ impl<'a, 'b> TyCtx<'a, 'b> {
                 }
                 _ => {
                     path.typing(ty);
-                    self.deps.1.insert(Borrow::<Ident>::borrow(path));
+                    self.deps.insert(Borrow::<Ident>::borrow(path));
                 }
             }
         } else {
