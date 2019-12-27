@@ -4,7 +4,7 @@ use syn::Ident;
 macro_rules! try_write {
     ($value:expr => $target:ident) => {{
         use syn::Error;
-        if let Some(_) = $target {
+        if $target.is_some() {
             return Err(Error::new_spanned($value, "Duplicated items"));
         }
 
