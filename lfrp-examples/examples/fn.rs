@@ -47,6 +47,7 @@ fn main() {
     let (mut dt, mut dh) = (0.5, 1.0);
 
     loop {
+        // update parameters
         if input.tmp > 35.0 || input.tmp < 20.0 {
             dt = -dt;
         }
@@ -57,8 +58,11 @@ fn main() {
         input.tmp += dt;
         input.hmd += dh;
 
+        // transaction
         frp.run(&input);
         let output = frp.sample().unwrap();
+
+        // print
         println!(
             "tmp={:2.2}, hmd={:2.2}, di={:2.2}, fan: {:-3}",
             input.tmp,
