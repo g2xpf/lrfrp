@@ -68,7 +68,7 @@ pub fn codegen(lfrp_ir: LfrpIR) -> TokenStream {
                 }
 
                 #[inline]
-                pub fn sample(&self) -> ::core::option::Option<&Out> {
+                pub fn sample(&self) -> core::option::Option<&Out> {
                     if self.running {
                         Some(&self.output)
                     } else {
