@@ -1,6 +1,3 @@
-#[cfg(feature = "print_codegen")]
-extern crate rustfmt;
-
 use super::lfrp_ir::LfrpIR;
 use proc_macro::TokenStream;
 use quote::quote;
