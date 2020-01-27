@@ -250,8 +250,8 @@ fn collect_global_idents(
         .try_for_each::<_, Result<_>>(|declaration| {
             use Declaration::*;
             match declaration {
-                Struct(e) => unimplemented!("struct pattern"),
-                Enum(e) => unimplemented!("enum pattern"),
+                Struct(_) => unimplemented!("struct pattern"),
+                Enum(_) => unimplemented!("enum pattern"),
                 Fn(e) => {
                     let ident = &e.ident;
                     match global.entry(ident.clone()) {

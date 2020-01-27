@@ -22,14 +22,6 @@ impl Type {
         Type::Mono(TypeMono::Type(MaybeType::Unresolved))
     }
 
-    pub fn unresolved_cell() -> Self {
-        Type::Lifted(TypeLifted::Cell(MaybeType::Unresolved))
-    }
-
-    pub fn resolved(ty: &types::Type) -> Self {
-        Type::Mono(TypeMono::Type(MaybeType::Resolved(Box::new(ty.clone()))))
-    }
-
     pub fn from_cell(ty: &types::Type) -> Self {
         Type::Lifted(TypeLifted::Cell(MaybeType::Resolved(Box::new(ty.clone()))))
     }
@@ -231,10 +223,6 @@ impl<'a, 'b, 'c> TyCtxRef<'a, 'b, 'c> {
 
     pub fn insert_variable(&self, path: &'c mut Path) {
         self.0.borrow_mut().insert_variable(path)
-    }
-
-    pub fn forbid_lifted(&self) -> bool {
-        self.0.borrow().forbid_lifted()
     }
 }
 

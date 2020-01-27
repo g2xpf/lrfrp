@@ -229,7 +229,7 @@ impl_to_tokens_for_key!(ItemArgs, args_token);
 #[derive(Debug)]
 pub struct ItemStruct;
 impl Parse for ItemStruct {
-    fn parse(input: ParseStream) -> Result<Self> {
+    fn parse(_input: ParseStream) -> Result<Self> {
         unimplemented!("impl parse for ItemStruct")
     }
 }
@@ -237,7 +237,7 @@ impl Parse for ItemStruct {
 #[derive(Debug)]
 pub struct ItemEnum;
 impl Parse for ItemEnum {
-    fn parse(input: ParseStream) -> Result<Self> {
+    fn parse(_input: ParseStream) -> Result<Self> {
         unimplemented!("impl parse for ItemEnum")
     }
 }
