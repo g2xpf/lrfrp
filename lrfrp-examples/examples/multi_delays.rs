@@ -1,4 +1,4 @@
-use lfrp_macros::frp;
+use lrfrp_macros::frp;
 
 use std::io::{self, Write};
 use std::thread;

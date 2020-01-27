@@ -1,16 +1,16 @@
-use super::lfrp_ir::LfrpIR;
+use super::lrfrp_ir::LrfrpIR;
 use proc_macro::TokenStream;
 use quote::quote;
 
-pub fn codegen(lfrp_ir: LfrpIR) -> TokenStream {
-    let LfrpIR {
+pub fn codegen(lrfrp_ir: LrfrpIR) -> TokenStream {
+    let LrfrpIR {
         module,
         input,
         output,
         args,
         declarations,
         body,
-    } = lfrp_ir;
+    } = lrfrp_ir;
 
     let module_name = &module.name;
 

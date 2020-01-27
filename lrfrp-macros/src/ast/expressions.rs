@@ -9,7 +9,7 @@ use super::types::Type;
 use std::borrow::Borrow;
 use std::ops::Deref;
 
-use crate::lfrp_ir::types;
+use crate::lrfrp_ir::types;
 
 use quote::{quote, ToTokens};
 

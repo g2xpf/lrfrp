@@ -1,8 +1,8 @@
 [workspace]
 
 members = [
-    "lfrp",
-    "lfrp-macros",
-    "lfrp-examples"
+    "lrfrp",
+    "lrfrp-macros",
+    "lrfrp-examples"
 ]
 

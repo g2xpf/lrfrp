@@ -10,7 +10,7 @@ mod typeck;
 pub mod types;
 
 #[derive(Debug)]
-pub struct LfrpIR {
+pub struct LrfrpIR {
     pub module: ast::ItemMod,
     pub input: ast::ItemIn,
     pub output: ast::ItemOut,
@@ -19,7 +19,7 @@ pub struct LfrpIR {
     pub body: deps_check::OrderedStmts,
 }
 
-impl LfrpIR {
+impl LrfrpIR {
     pub fn from_ast(ast: ast::Ast) -> Result<Self> {
         let mut module = None;
         let mut input = None;
@@ -48,7 +48,7 @@ impl LfrpIR {
         let (declarations, body) =
             deps_check::deps_check(&input, &output, &args, declarations, frp_stmts)?;
 
-        Ok(LfrpIR {
+        Ok(LrfrpIR {
             module,
             input,
             output,

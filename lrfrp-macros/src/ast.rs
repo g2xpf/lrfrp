@@ -347,7 +347,7 @@ pub struct FrpStmtDependency {
 
 impl ToTokens for FrpStmtDependency {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        use crate::lfrp_ir::types::*;
+        use crate::lrfrp_ir::types::*;
         match &self.path {
             path::Path::Segment(_) => unreachable!(),
             path::Path::TypedSegment(_, ty) => match ty {

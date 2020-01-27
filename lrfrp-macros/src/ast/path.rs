@@ -5,7 +5,7 @@ use syn::Ident;
 use syn::Result;
 use syn::Token;
 
-use crate::lfrp_ir::types;
+use crate::lrfrp_ir::types;
 
 use super::types::Type;
 
