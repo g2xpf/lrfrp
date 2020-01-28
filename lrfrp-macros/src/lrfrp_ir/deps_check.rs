@@ -254,9 +254,10 @@ fn collect_global_idents(
                 Enum(_) => unimplemented!("enum pattern"),
                 Fn(e) => {
                     let ident = &e.ident;
+                    let ty = &e.output;
                     match global.entry(ident.clone()) {
                         Entry::Vacant(e) => {
-                            e.insert(Type::from_local());
+                            e.insert(Type::from_type(ty));
                             Ok(())
                         }
                         Entry::Occupied(_) => Err(MultipleDefinitionError::new(ident).into()),

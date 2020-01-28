@@ -22,6 +22,10 @@ impl Type {
         Type::Mono(TypeMono::Type(MaybeType::Unresolved))
     }
 
+    pub fn from_type(ty: &types::Type) -> Self {
+        Type::Mono(TypeMono::Type(MaybeType::Resolved(Box::new(ty.clone()))))
+    }
+
     pub fn from_cell(ty: &types::Type) -> Self {
         Type::Lifted(TypeLifted::Cell(MaybeType::Resolved(Box::new(ty.clone()))))
     }
