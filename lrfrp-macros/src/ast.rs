@@ -2,7 +2,7 @@ use syn::braced;
 use syn::parenthesized;
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
-use syn::token::{Brace, Comma, Let, Paren};
+use syn::token::{Brace, Comma, Paren};
 use syn::{Ident, Result, Token};
 
 use quote::{quote, ToTokens};
@@ -30,7 +30,7 @@ pub enum Item {
     Out(ItemOut),
     Args(ItemArgs),
     FrpStmt(ItemFrpStmt),
-    Declaration(Declaration),
+    Declaration(ItemDeclaration),
 }
 
 impl Parse for Item {
@@ -39,23 +39,16 @@ impl Parse for Item {
 
         let lookahead = input.lookahead1();
         if lookahead.peek(Token![mod]) {
-            Ok(Mod(ItemMod {
-                mod_token: input.parse()?,
-                name: input.parse()?,
-                semi_token: input.parse()?,
-            }))
+            Ok(input.parse().map(Mod)?)
         } else if lookahead.peek(custom_keywords::In) {
             Ok(input.parse().map(In)?)
         } else if lookahead.peek(custom_keywords::Out) {
             Ok(input.parse().map(Out)?)
         } else if lookahead.peek(custom_keywords::Args) {
             Ok(input.parse().map(Args)?)
-        } else if lookahead.peek(Token![struct])
-            || lookahead.peek(Token![enum])
-            || lookahead.peek(Token![fn])
-        {
+        } else if lookahead.peek(Token![fn]) {
             Ok(input.parse().map(Declaration)?)
-        } else if lookahead.peek(Let) {
+        } else if lookahead.peek(Token![let]) {
             Ok(input.parse().map(FrpStmt)?)
         } else {
             Err(lookahead.error())
@@ -123,6 +116,16 @@ pub struct ItemMod {
     pub mod_token: Token![mod],
     pub name: Ident,
     pub semi_token: Token![;],
+}
+
+impl Parse for ItemMod {
+    fn parse(input: ParseStream) -> Result<Self> {
+        Ok(ItemMod {
+            mod_token: input.parse()?,
+            name: input.parse()?,
+            semi_token: input.parse()?,
+        })
+    }
 }
 
 impl ToTokens for ItemMod {
@@ -243,15 +246,15 @@ impl Parse for ItemEnum {
 }
 
 #[derive(Debug)]
-pub enum Declaration {
+pub enum ItemDeclaration {
     Struct(ItemStruct),
     Enum(ItemEnum),
     Fn(ItemFn),
 }
 
-impl Parse for Declaration {
+impl Parse for ItemDeclaration {
     fn parse(input: ParseStream) -> Result<Self> {
-        use Declaration::*;
+        use ItemDeclaration::*;
 
         let lookahead = input.lookahead1();
         if lookahead.peek(Token![struct]) {
@@ -266,9 +269,9 @@ impl Parse for Declaration {
     }
 }
 
-impl ToTokens for Declaration {
+impl ToTokens for ItemDeclaration {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        use Declaration::*;
+        use ItemDeclaration::*;
         match self {
             Struct(_) => unimplemented!("impl ToTokens for Declaration"),
             Enum(_) => unimplemented!("impl ToTokens for Declaration"),
@@ -338,7 +341,7 @@ impl Parse for ItemFrpStmt {
 
 #[derive(Debug)]
 pub struct FrpStmtDependency {
-    pub let_token: Let,
+    pub let_token: Token![let],
     pub path: path::Path,
     pub eq_token: Token![=],
     pub expr: expressions::Expr,
@@ -367,7 +370,7 @@ impl ToTokens for FrpStmtDependency {
 
 #[derive(Debug)]
 pub struct FrpStmtArrow {
-    pub let_token: Let,
+    pub let_token: Token![let],
     pub path: path::Path,
     pub colon_token: Token![:],
     pub ty: types::Type,

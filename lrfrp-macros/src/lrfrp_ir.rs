@@ -15,7 +15,7 @@ pub struct LrfrpIR {
     pub input: ast::ItemIn,
     pub output: ast::ItemOut,
     pub args: Option<ast::ItemArgs>,
-    pub declarations: Vec<ast::Declaration>,
+    pub declarations: Vec<ast::ItemDeclaration>,
     pub body: deps_check::OrderedStmts,
 }
 

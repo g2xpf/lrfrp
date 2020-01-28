@@ -7,7 +7,7 @@ use std::borrow::Borrow;
 use std::collections::{HashMap, HashSet};
 
 use crate::ast::{
-    Declaration, Field, FrpStmtArrow, FrpStmtDependency, ItemArgs, ItemFrpStmt, ItemIn, ItemOut,
+    Field, FrpStmtArrow, FrpStmtDependency, ItemArgs, ItemDeclaration, ItemFrpStmt, ItemIn, ItemOut,
 };
 use syn::{Ident, Result};
 
@@ -88,9 +88,9 @@ pub fn deps_check(
     input: &ItemIn,
     output: &ItemOut,
     args: &Option<ItemArgs>,
-    mut declarations: Vec<Declaration>,
+    mut declarations: Vec<ItemDeclaration>,
     mut frp_stmts: Vec<ItemFrpStmt>,
-) -> Result<(Vec<Declaration>, OrderedStmts)> {
+) -> Result<(Vec<ItemDeclaration>, OrderedStmts)> {
     // collect identifiers of global let-bindings
     let calculation_order = {
         let global = collect_global_idents(&input, &output, &args, &declarations, &frp_stmts)?;
@@ -152,13 +152,13 @@ fn generate_ordered_stmts(
 
 fn extract_deps<'a, 'b>(
     global: &'a VarEnv,
-    declarations: &'b mut Vec<Declaration>,
+    declarations: &'b mut Vec<ItemDeclaration>,
     frp_stmts: &'b mut Vec<ItemFrpStmt>,
 ) -> Result<VarDependency<'b>> {
     declarations
         .iter_mut()
         .try_for_each::<_, Result<_>>(|declaration| {
-            use Declaration::*;
+            use ItemDeclaration::*;
             match declaration {
                 Struct(_) => unimplemented!("extract_deps case"),
                 Enum(_) => unimplemented!("extract_deps case"),
@@ -211,7 +211,7 @@ fn collect_global_idents(
     input: &ItemIn,
     output: &ItemOut,
     args: &Option<ItemArgs>,
-    declarations: &Vec<Declaration>,
+    declarations: &Vec<ItemDeclaration>,
     frp_stmts: &Vec<ItemFrpStmt>,
 ) -> Result<VarEnv> {
     let mut global =
@@ -248,7 +248,7 @@ fn collect_global_idents(
     declarations
         .into_iter()
         .try_for_each::<_, Result<_>>(|declaration| {
-            use Declaration::*;
+            use ItemDeclaration::*;
             match declaration {
                 Struct(_) => unimplemented!("struct pattern"),
                 Enum(_) => unimplemented!("enum pattern"),
