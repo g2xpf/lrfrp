@@ -35,12 +35,12 @@ pub fn codegen(lrfrp_ir: LrfrpIR) -> TokenStream {
     let token_stream = quote! {
         #[allow(non_snake_case)]
         mod #module_name {
-            #(#declarations)*
-
             #input
             #output
             #args
             #cell_definition
+
+            #(#declarations)*
 
             #[derive(Clone, Default)]
             pub struct FRP {
