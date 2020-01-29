@@ -38,7 +38,7 @@ impl UndefinedVariableError {
 impl Into<syn::Error> for UndefinedVariableError {
     fn into(self) -> syn::Error {
         let token = &self.0;
-        let message = format!("Undefined variable `{}`", token.to_string());
+        let message = format!("use of undefined variable: `{}`", token.to_string());
         syn::Error::new_spanned(token, message)
     }
 }
@@ -55,7 +55,7 @@ impl MultipleDefinitionError {
 impl Into<syn::Error> for MultipleDefinitionError {
     fn into(self) -> syn::Error {
         let token = &self.0;
-        let message = format!("Multiple definition `{}`", token.to_string());
+        let message = format!("multiple definition: `{}`", token.to_string());
         syn::Error::new_spanned(token, message)
     }
 }
@@ -73,7 +73,7 @@ impl Into<syn::Error> for NotCalculatedError {
     fn into(self) -> syn::Error {
         let token = &self.0;
         let message = format!(
-            "Output variable `{}` won't be calculated",
+            "output variable `{}` won't be calculated",
             token.to_string()
         );
         syn::Error::new_spanned(token, message)

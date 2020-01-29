@@ -172,11 +172,7 @@ fn extract_deps<'a, 'b>(
     frp_stmts
         .iter_mut()
         .try_fold(VarDependency::new(), |mut acc, frp_stmt| match frp_stmt {
-            ItemFrpStmt::Dependency(FrpStmtDependency {
-                ref mut path,
-                ref mut expr,
-                ..
-            }) => {
+            ItemFrpStmt::Dependency(FrpStmtDependency { path, expr, .. }) => {
                 let ty = global.get(Borrow::<Ident>::borrow(path));
                 if let Some(ty) = ty {
                     path.typing(ty);
@@ -188,10 +184,10 @@ fn extract_deps<'a, 'b>(
                 Ok(acc)
             }
             ItemFrpStmt::Arrow(FrpStmtArrow {
-                ref mut path,
+                path,
                 ty,
-                ref mut arrow_expr,
-                ref mut expr,
+                arrow_expr,
+                expr,
                 ..
             }) => {
                 path.typing(&Type::from_cell(ty));
