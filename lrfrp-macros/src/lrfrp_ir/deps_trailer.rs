@@ -7,6 +7,8 @@ use std::ops::DerefMut;
 use syn::punctuated::Punctuated;
 use syn::Result;
 
+// TODO: simpler implementation
+
 pub type Context<'a, 'b, 'c, 'd> = &'a TyCtxRef<'b, 'c, 'd>;
 
 pub struct DepExtractor<'a> {
