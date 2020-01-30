@@ -19,7 +19,7 @@ use syn::token::{
     Add, And, AndAnd, Bang, Caret, Comma, Div, Dot, EqEq, Ge, Gt, Le, Lt, Ne, Or, OrOr, Rem, Shl,
     Shr, Star, Sub,
 };
-use syn::token::{Brace, Bracket, Colon, Dot2, Else, FatArrow, If, Match, Paren};
+use syn::token::{Brace, Bracket, Colon, Dot2, FatArrow, If, Match, Paren};
 use syn::Result;
 use syn::Token;
 use syn::{braced, bracketed, parenthesized};
@@ -146,7 +146,7 @@ fn atom_expr(input: ParseStream, allow_struct: AllowStruct) -> Result<Expr> {
         paren_or_tuple(input)
     } else if input.peek(Bracket) {
         input.parse().map(Expr::List)
-    } else if input.peek(If) {
+    } else if input.peek(Token![if]) {
         input.parse().map(Expr::If)
     } else if input.peek(Match) {
         unimplemented!("Match")
@@ -441,11 +441,11 @@ pub struct ExprIndex {
 
 #[derive(Debug)]
 pub struct ExprIf {
-    pub if_token: If,
+    pub if_token: Token![if],
     pub cond: Box<Expr>,
     pub then_token: then,
     pub then_branch: Box<Expr>,
-    pub else_token: Else,
+    pub else_token: Token![else],
     pub else_branch: Box<Expr>,
 }
 
