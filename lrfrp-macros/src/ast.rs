@@ -86,6 +86,20 @@ impl Parse for ItemFn {
     }
 }
 
+impl ToTokens for ItemFn {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let ident = &self.ident;
+        let inputs = &self.inputs;
+        let output = &self.output;
+        let expr = &self.expr;
+        tokens.extend(quote! {
+            fn #ident(#inputs) -> #output {
+                #expr
+            }
+        });
+    }
+}
+
 #[derive(Debug)]
 pub struct FnArg {
     pub pat: patterns::Pat,
@@ -275,17 +289,7 @@ impl ToTokens for ItemDeclaration {
         match self {
             Struct(_) => unimplemented!("impl ToTokens for Declaration"),
             Enum(_) => unimplemented!("impl ToTokens for Declaration"),
-            Fn(e) => {
-                let ident = &e.ident;
-                let inputs = &e.inputs;
-                let output = &e.output;
-                let expr = &e.expr;
-                tokens.extend(quote! {
-                    fn #ident(#inputs) -> #output {
-                        #expr
-                    }
-                });
-            }
+            Fn(e) => e.to_tokens(tokens),
         }
     }
 }
