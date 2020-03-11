@@ -1,8 +1,7 @@
 use lrfrp_macros::frp;
 
 use std::io::{self, Write};
-use std::thread;
-use std::time::Duration;
+use std::{thread, time::Duration};
 
 frp! {
     mod Accumulator;

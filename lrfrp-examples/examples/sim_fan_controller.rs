@@ -1,8 +1,6 @@
-use lrfrp_macros::frp;
+use std::{thread, time::Duration};
 
-use std::io::{self, Write};
-use std::thread;
-use std::time::Duration;
+use lrfrp_macros::frp;
 
 frp! {
     mod SimFanController;
@@ -17,7 +15,6 @@ frp! {
     }
 
     Out {
-        di: f32,
         fan: bool,
     }
 
@@ -52,15 +49,14 @@ fn main() {
 
         frp.run(&input);
         let output = frp.sample().unwrap();
+
         println!(
-            "tmp={:2.2}, hmd={:2.2}, di={:2.2}, fan: {:-3}",
+            "tmp={:2.2}, hmd={:2.2}, fan: {:-3}",
             input.tmp,
             input.hmd,
-            output.di,
             if output.fan { "ON" } else { "OFF" }
         );
-        thread::sleep(Duration::from_millis(200));
-        print!("{}", ansi_escapes::EraseLines(2));
-        io::stdout().flush().unwrap();
+
+        thread::sleep(Duration::from_millis(33))
     }
 }
