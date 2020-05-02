@@ -5,7 +5,6 @@ mod deps_check;
 mod deps_trailer;
 mod error;
 mod tsort;
-mod typeck;
 pub mod types;
 
 macro_rules! try_write {

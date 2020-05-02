@@ -24,7 +24,7 @@ frp! {
         let p1 = input + 1.0;
         let p2 = p1 + {
             let a2 = 3.0;
-            input + c1 * a2 ** a2
+            input + c1 * a2 + a2
         };
         p2
     };

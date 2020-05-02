@@ -1,13 +1,15 @@
 use syn::braced;
 use syn::parenthesized;
 use syn::parse::{Parse, ParseStream};
-use syn::punctuated::Punctuated;
+use syn::punctuated::{Pair, Punctuated};
 use syn::token::{Brace, Comma, Paren};
 use syn::{Ident, Result, Token};
 
 use quote::{quote, ToTokens};
 
 use proc_macro2::TokenStream;
+
+use std::borrow::Borrow;
 
 pub mod custom_keywords;
 pub mod custom_punctuations;
@@ -56,6 +58,7 @@ impl Parse for Item {
     }
 }
 
+// Function declaration
 #[derive(Debug)]
 pub struct ItemFn {
     pub fn_token: Token![fn],
@@ -100,6 +103,7 @@ impl ToTokens for ItemFn {
     }
 }
 
+// Function arguments
 #[derive(Debug)]
 pub struct FnArg {
     pub pat: patterns::Pat,
@@ -125,6 +129,7 @@ impl ToTokens for FnArg {
     }
 }
 
+// Module name declaration
 #[derive(Debug)]
 pub struct ItemMod {
     pub mod_token: Token![mod],
@@ -150,6 +155,7 @@ impl ToTokens for ItemMod {
     }
 }
 
+// Field declaration
 #[derive(Debug)]
 pub struct Field {
     pub ident: Ident,
@@ -163,7 +169,7 @@ impl ToTokens for Field {
         let colon_token = &self.colon_token;
         let ty = &self.ty;
         tokens.extend(quote! {
-            pub #ident #colon_token #ty
+            #ident #colon_token #ty
         });
     }
 }
@@ -239,7 +245,25 @@ macro_rules! impl_to_tokens_for_key {
                 }
                 self.$token_param.to_tokens(tokens);
                 self.braced_token.surround(tokens, |tokens| {
-                    self.fields.to_tokens(tokens);
+                    for pair in self.fields.pairs() {
+                        use Pair::*;
+
+                        let field;
+                        let comma;
+                        match pair {
+                            Punctuated(f, c) => {
+                                field = f;
+                                comma = Some(c);
+                            }
+                            End(f) => {
+                                field = f;
+                                comma = None;
+                            }
+                        }
+                        tokens.extend(quote! {
+                            pub #field #comma
+                        });
+                    }
                 });
             }
         }
@@ -401,5 +425,62 @@ impl Parse for Ast {
         }
 
         Ok(Ast { items })
+    }
+}
+
+#[derive(Debug)]
+pub struct FrpStmtArrows(Vec<FrpStmtArrow>);
+
+impl FrpStmtArrows {
+    pub fn new() -> Self {
+        FrpStmtArrows(vec![])
+    }
+
+    pub fn push(&mut self, arrow: FrpStmtArrow) {
+        self.0.push(arrow);
+    }
+
+    pub fn cell_definition(&self) -> TokenStream {
+        let mut fields = TokenStream::new();
+        for arrow in &self.0 {
+            let ident: &Ident = arrow.path.borrow();
+            let colon = &arrow.colon_token;
+            let ty = &arrow.ty;
+            fields.extend(quote! {
+                #ident #colon #ty,
+            });
+        }
+
+        quote! {
+            #[derive(Clone, Default)]
+            struct Cell {
+                #fields
+            }
+        }
+    }
+
+    pub fn cell_updates(&self) -> TokenStream {
+        let mut cell_updates = TokenStream::new();
+        for arrow in &self.0 {
+            let path = &arrow.path;
+            let expr = &arrow.expr;
+            cell_updates.extend(quote! {
+                #path = #expr;
+            });
+        }
+
+        cell_updates
+    }
+
+    pub fn cell_initializations(&self) -> TokenStream {
+        let mut cell_initializations = TokenStream::new();
+        for arrow in &self.0 {
+            let path = &arrow.path;
+            let expr = &arrow.arrow_expr.expr;
+            cell_initializations.extend(quote! {
+                #path = #expr;
+            });
+        }
+        cell_initializations
     }
 }

@@ -7,20 +7,17 @@ use std::borrow::Borrow;
 use std::collections::{HashMap, HashSet};
 
 use crate::ast::{
-    Field, FrpStmtArrow, FrpStmtDependency, ItemArgs, ItemDeclaration, ItemFrpStmt, ItemIn, ItemOut,
+    Field, FrpStmtArrow, FrpStmtArrows, FrpStmtDependency, ItemArgs, ItemDeclaration, ItemFrpStmt,
+    ItemIn, ItemOut,
 };
 use syn::{Ident, Result};
-
-use proc_macro2::TokenStream;
-
-use quote::quote;
 
 use std::collections::hash_map::Entry;
 
 #[derive(Debug)]
 pub struct OrderedStmts {
     pub dependencies: Vec<FrpStmtDependency>,
-    pub arrows: Vec<FrpStmtArrow>,
+    pub arrows: FrpStmtArrows,
 }
 
 struct VarDependency<'a> {
@@ -28,59 +25,12 @@ struct VarDependency<'a> {
     pub arrows: HashMap<Var<'a>, HashSet<Var<'a>>>,
 }
 
-impl<'a> VarDependency<'a> {
+impl VarDependency<'_> {
     fn new() -> Self {
         VarDependency {
             dependencies: HashMap::new(),
             arrows: HashMap::new(),
         }
-    }
-}
-
-impl OrderedStmts {
-    pub fn cell_definition(&self) -> TokenStream {
-        let mut fields = TokenStream::new();
-        for arrow in self.arrows.iter() {
-            let ident: &Ident = &arrow.path.borrow();
-            let colon_token = &arrow.colon_token;
-            let ty = &arrow.ty;
-            let field = quote! {
-                #ident #colon_token #ty,
-            };
-            fields.extend(field);
-        }
-
-        quote! {
-            #[derive(Clone, Default)]
-            struct Cell {
-                #fields
-            }
-        }
-    }
-
-    pub fn cell_updates(&self) -> TokenStream {
-        let mut cell_updates = TokenStream::new();
-        for arrow in self.arrows.iter() {
-            let path = &arrow.path;
-            let expr = &arrow.expr;
-            cell_updates.extend(quote! {
-                #path = #expr;
-            });
-        }
-
-        cell_updates
-    }
-
-    pub fn cell_initializations(&self) -> TokenStream {
-        let mut cell_initializations = TokenStream::new();
-        for arrow in self.arrows.iter() {
-            let path = &arrow.path;
-            let expr = &arrow.arrow_expr.expr;
-            cell_initializations.extend(quote! {
-                #path = #expr;
-            });
-        }
-        cell_initializations
     }
 }
 
@@ -119,7 +69,7 @@ fn generate_ordered_stmts(
     let mut deps_map = HashMap::new();
     let mut arrows_map = HashMap::new();
     let mut dependencies = vec![];
-    let mut arrows = vec![];
+    let mut arrows = FrpStmtArrows::new();
 
     frp_stmts.into_iter().for_each(|frp_stmt| match frp_stmt {
         ItemFrpStmt::Dependency(dep) => {
@@ -207,8 +157,8 @@ fn collect_global_idents(
     input: &ItemIn,
     output: &ItemOut,
     args: &Option<ItemArgs>,
-    declarations: &Vec<ItemDeclaration>,
-    frp_stmts: &Vec<ItemFrpStmt>,
+    declarations: &[ItemDeclaration],
+    frp_stmts: &[ItemFrpStmt],
 ) -> Result<VarEnv> {
     let mut global =
         frp_stmts
@@ -242,7 +192,7 @@ fn collect_global_idents(
 
     // register declarations
     declarations
-        .into_iter()
+        .iter()
         .try_for_each::<_, Result<_>>(|declaration| {
             use ItemDeclaration::*;
             match declaration {
