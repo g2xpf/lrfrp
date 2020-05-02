@@ -36,6 +36,23 @@ impl Into<syn::Error> for MultipleDefinitionError {
 }
 
 #[derive(Debug)]
+pub struct CellAsOutputError(Ident);
+
+impl CellAsOutputError {
+    pub fn new(ident: Var) -> Self {
+        CellAsOutputError(ident.clone())
+    }
+}
+
+impl Into<syn::Error> for CellAsOutputError {
+    fn into(self) -> syn::Error {
+        let token = &self.0;
+        let message = format!("use delayed variable `{}` as output", token.to_string());
+        syn::Error::new_spanned(token, message)
+    }
+}
+
+#[derive(Debug)]
 pub struct NotCalculatedError(Ident);
 
 impl NotCalculatedError {

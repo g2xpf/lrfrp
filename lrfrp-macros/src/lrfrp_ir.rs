@@ -68,8 +68,7 @@ impl LrfrpIR {
         item_unwrap!(input, "In");
         item_unwrap!(output, "Out");
 
-        let (declarations, body) =
-            deps_check::deps_check(&input, &output, &args, declarations, frp_stmts)?;
+        let body = deps_check::deps_check(&input, &output, &args, &mut declarations, frp_stmts)?;
 
         Ok(LrfrpIR {
             module,

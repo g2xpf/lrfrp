@@ -1,7 +1,7 @@
 use super::deps_trailer::DepExtractor;
-use super::error::{MultipleDefinitionError, NotCalculatedError};
+use super::error::{CellAsOutputError, MultipleDefinitionError, NotCalculatedError};
 use super::tsort;
-use super::types::{Type, Var, VarEnv};
+use super::types::{Type, TypeLifted, Var, VarEnv};
 
 use std::borrow::Borrow;
 use std::collections::{HashMap, HashSet};
@@ -38,14 +38,14 @@ pub fn deps_check(
     input: &ItemIn,
     output: &ItemOut,
     args: &Option<ItemArgs>,
-    mut declarations: Vec<ItemDeclaration>,
+    declarations: &mut [ItemDeclaration],
     mut frp_stmts: Vec<ItemFrpStmt>,
-) -> Result<(Vec<ItemDeclaration>, OrderedStmts)> {
+) -> Result<OrderedStmts> {
     // collect identifiers of global let-bindings
     let calculation_order = {
-        let global = collect_global_idents(&input, &output, &args, &declarations, &frp_stmts)?;
+        let global = collect_global_idents(&input, &output, &args, declarations, &frp_stmts)?;
 
-        let deps = extract_deps(&global, &mut declarations, &mut frp_stmts)?;
+        let deps = extract_deps(&global, declarations, &mut frp_stmts)?;
         let sorted_dependencies = tsort::tsort(&deps.dependencies)?
             .map(|ident| ident.to_string())
             .rev()
@@ -56,10 +56,7 @@ pub fn deps_check(
         (sorted_dependencies, sorted_arrows)
     };
 
-    Ok((
-        declarations,
-        generate_ordered_stmts(frp_stmts, calculation_order),
-    ))
+    Ok(generate_ordered_stmts(frp_stmts, calculation_order))
 }
 
 fn generate_ordered_stmts(
@@ -102,7 +99,7 @@ fn generate_ordered_stmts(
 
 fn extract_deps<'a, 'b>(
     global: &'a VarEnv,
-    declarations: &'b mut Vec<ItemDeclaration>,
+    declarations: &'b mut [ItemDeclaration],
     frp_stmts: &'b mut Vec<ItemFrpStmt>,
 ) -> Result<VarDependency<'b>> {
     declarations
@@ -220,6 +217,10 @@ fn collect_global_idents(
             match global.entry(ident.clone()) {
                 Entry::Occupied(ref mut e) => {
                     let untyped = e.get_mut();
+                    // prevent from using the output variables as Cell
+                    if let Type::Lifted(TypeLifted::Cell(_)) = untyped {
+                        return Err(CellAsOutputError::new(e.key()).into());
+                    }
                     *untyped = Type::from_output(ty);
                     Ok(())
                 }
@@ -227,7 +228,7 @@ fn collect_global_idents(
             }
         })?;
 
-    // prevent multiple definition
+    // prevent from multiple definition
     input
         .fields
         .iter()
