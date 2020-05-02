@@ -226,10 +226,17 @@ macro_rules! impl_to_tokens_for_key {
     ($type:tt, $token_param:ident) => {
         impl ToTokens for $type {
             fn to_tokens(&self, tokens: &mut TokenStream) {
-                tokens.extend(quote! {
-                    #[derive(Debug, Clone, Default)]
-                    pub struct
-                });
+                if cfg!(feature = "impl-debug") {
+                    tokens.extend(quote! {
+                        #[derive(Debug, Clone, Default)]
+                        pub struct
+                    });
+                } else {
+                    tokens.extend(quote! {
+                        #[derive(Clone, Default)]
+                        pub struct
+                    });
+                }
                 self.$token_param.to_tokens(tokens);
                 self.braced_token.surround(tokens, |tokens| {
                     self.fields.to_tokens(tokens);

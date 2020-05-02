@@ -11,6 +11,7 @@ proc-macro = true
 
 [features]
 print-codegen = ["rustfmt"]
+impl-debug = []
 
 [dependencies]
 quote = "1.0"
