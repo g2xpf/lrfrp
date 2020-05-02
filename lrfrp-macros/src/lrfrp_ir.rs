@@ -1,13 +1,37 @@
 use super::ast::{self, Item};
 use syn::Result;
 
-#[macro_use]
-mod error;
 mod deps_check;
 mod deps_trailer;
+mod error;
 mod tsort;
 mod typeck;
 pub mod types;
+
+macro_rules! try_write {
+    ($value:expr => $target:ident) => {{
+        use syn::Error;
+        if $target.is_some() {
+            return Err(Error::new_spanned($value, "Duplicated items"));
+        }
+
+        $target = Some($value);
+    }};
+}
+
+macro_rules! item_unwrap {
+    ($value:ident, $item_name:expr) => {
+        let $value = match $value {
+            Some(value) => value,
+            None => {
+                return syn::Result::Err(syn::Error::new(
+                    proc_macro2::Span::call_site(),
+                    format!(r#"Item `{}` not found"#, $item_name),
+                ))
+            }
+        };
+    };
+}
 
 #[derive(Debug)]
 pub struct LrfrpIR {
