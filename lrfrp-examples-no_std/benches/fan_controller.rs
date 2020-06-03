@@ -60,7 +60,7 @@ pub fn bench(c: &mut Criterion) {
 
     c.bench_function("fan_controller", |b| {
         b.iter(|| {
-            for _ in 0..black_box(10_000_000) {
+            for _ in 0..black_box(1_000_000) {
                 if input.tmp > 35.0 || input.tmp < 20.0 {
                     dt = -dt;
                 }
