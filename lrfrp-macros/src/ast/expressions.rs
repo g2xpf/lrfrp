@@ -1,5 +1,4 @@
 use super::custom_keywords::{delay, then};
-use super::custom_punctuations::StarStar;
 use super::literals::Lit;
 use super::path::Path;
 use super::patterns::Pat;
@@ -578,22 +577,9 @@ pub struct ExprBinary {
 
 impl ToTokens for ExprBinary {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let lhs = &self.lhs;
-        let op = &self.op;
-        let rhs = &self.rhs;
-        // TODO: choose pow or ipow depends on its type
-        match op {
-            BinOp::Pow(_) => {
-                tokens.extend(quote! {
-                    (#lhs as f32).powf(#rhs as f32)
-                });
-            }
-            _ => {
-                self.lhs.to_tokens(tokens);
-                self.op.to_tokens(tokens);
-                self.rhs.to_tokens(tokens);
-            }
-        }
+        self.lhs.to_tokens(tokens);
+        self.op.to_tokens(tokens);
+        self.rhs.to_tokens(tokens);
     }
 }
 
@@ -678,14 +664,11 @@ pub enum BinOp {
     Ne(Ne),
     Ge(Ge),
     Gt(Gt),
-    Pow(StarStar),
 }
 
 impl Parse for BinOp {
     fn parse(input: ParseStream) -> Result<Self> {
-        if input.peek(StarStar) {
-            input.parse().map(BinOp::Pow)
-        } else if input.peek(Token![&&]) {
+        if input.peek(Token![&&]) {
             input.parse().map(BinOp::And)
         } else if input.peek(Token![||]) {
             input.parse().map(BinOp::Or)
@@ -732,25 +715,24 @@ impl ToTokens for BinOp {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         use BinOp::*;
         match self {
-            Add(ref e) => e.to_tokens(tokens),
-            Sub(ref e) => e.to_tokens(tokens),
-            Mul(ref e) => e.to_tokens(tokens),
-            Div(ref e) => e.to_tokens(tokens),
-            Rem(ref e) => e.to_tokens(tokens),
-            And(ref e) => e.to_tokens(tokens),
-            Or(ref e) => e.to_tokens(tokens),
-            BitXor(ref e) => e.to_tokens(tokens),
-            BitAnd(ref e) => e.to_tokens(tokens),
-            BitOr(ref e) => e.to_tokens(tokens),
-            Shl(ref e) => e.to_tokens(tokens),
-            Shr(ref e) => e.to_tokens(tokens),
-            Eq(ref e) => e.to_tokens(tokens),
-            Lt(ref e) => e.to_tokens(tokens),
-            Le(ref e) => e.to_tokens(tokens),
-            Ne(ref e) => e.to_tokens(tokens),
-            Ge(ref e) => e.to_tokens(tokens),
-            Gt(ref e) => e.to_tokens(tokens),
-            Pow(_) => unreachable!(),
+            Add(e) => e.to_tokens(tokens),
+            Sub(e) => e.to_tokens(tokens),
+            Mul(e) => e.to_tokens(tokens),
+            Div(e) => e.to_tokens(tokens),
+            Rem(e) => e.to_tokens(tokens),
+            And(e) => e.to_tokens(tokens),
+            Or(e) => e.to_tokens(tokens),
+            BitXor(e) => e.to_tokens(tokens),
+            BitAnd(e) => e.to_tokens(tokens),
+            BitOr(e) => e.to_tokens(tokens),
+            Shl(e) => e.to_tokens(tokens),
+            Shr(e) => e.to_tokens(tokens),
+            Eq(e) => e.to_tokens(tokens),
+            Lt(e) => e.to_tokens(tokens),
+            Le(e) => e.to_tokens(tokens),
+            Ne(e) => e.to_tokens(tokens),
+            Ge(e) => e.to_tokens(tokens),
+            Gt(e) => e.to_tokens(tokens),
         }
     }
 }

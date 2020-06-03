@@ -26,11 +26,11 @@ pub fn codegen(lrfrp_ir: LrfrpIR) -> TokenStream {
         }
     });
 
-    let cell_definition = body.cell_definition();
+    let cell_definition = body.arrows.cell_definition();
     let calculations = &body.dependencies;
 
-    let cell_initializations = body.cell_initializations();
-    let cell_updates = body.cell_updates();
+    let cell_initializations = body.arrows.cell_initializations();
+    let cell_updates = body.arrows.cell_updates();
 
     let token_stream = quote! {
         #[allow(non_snake_case)]

@@ -14,7 +14,6 @@ pub enum Precedence {
     Shift,
     Arithmetic,
     Term,
-    Pow,
     Cast,
 }
 
@@ -35,7 +34,6 @@ impl Precedence {
             | BinOp::Ne(_)
             | BinOp::Ge(_)
             | BinOp::Gt(_) => Precedence::Compare,
-            BinOp::Pow(_) => Precedence::Pow,
         }
     }
 
