@@ -64,10 +64,7 @@ impl NotCalculatedError {
 impl Into<syn::Error> for NotCalculatedError {
     fn into(self) -> syn::Error {
         let token = &self.0;
-        let message = format!(
-            "output variable `{}` won't be calculated",
-            token.to_string()
-        );
+        let message = format!("output variable `{}` not calculated", token.to_string());
         syn::Error::new_spanned(token, message)
     }
 }
@@ -86,7 +83,7 @@ impl Into<syn::Error> for LiftedTypeNotAllowedError {
         let token = self.0;
         let ty = &self.1;
         let message = format!(
-            "Variable `{}` has the lifted type `{}`",
+            "Variable `{}` has lifted type `{}`",
             token.to_string(),
             ty.to_string()
         );
@@ -107,7 +104,7 @@ impl Into<syn::Error> for CyclicDependencyError {
     fn into(self) -> syn::Error {
         let token = &self.0;
         let message = format!(
-            "cyclic dependency found in the definition `{}`",
+            "cyclic dependency found in definition `{}`",
             token.to_string(),
         );
         syn::Error::new_spanned(token, message)
