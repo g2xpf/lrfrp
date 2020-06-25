@@ -10,19 +10,6 @@ extern crate libc;
 // use core::panic::PanicInfo;
 use lrfrp_macros::frp;
 
-// #[lang = "eh_personality"]
-// extern "C" fn eh_personality() {}
-//
-// #[panic_handler]
-// fn panic(_info: &PanicInfo) -> ! {
-//     loop {}
-// }
-
-// extern "C" {
-//     pub fn printf(format: *const u8, ...) -> i32;
-// }
-
-// FanController の LRFRP プログラム
 frp! {
     mod FanController;
 
@@ -43,11 +30,6 @@ frp! {
     let th = 75.0 + if fan_delayed then -0.5 else 0.5;
 }
 
-// #[no_mangle]
-// pub extern "C" fn main(_nargs: i32, _args: *const *const u8) -> i32 {
-//     0
-// }
-
 pub fn bench(c: &mut Criterion) {
     let mut frp = FanController::FRP::new();
 
@@ -60,7 +42,7 @@ pub fn bench(c: &mut Criterion) {
 
     c.bench_function("fan_controller", |b| {
         b.iter(|| {
-            for _ in 0..black_box(1_000_000) {
+            for _ in 0..black_box(3_000_000) {
                 if input.tmp > 35.0 || input.tmp < 20.0 {
                     dt = -dt;
                 }

@@ -51,9 +51,7 @@ pub extern "C" fn main(_nargs: i32, _args: *const *const u8) -> i32 {
 
     let (mut dt, mut dh) = (0.5, 1.0);
 
-    let mut output = FanController::Out::default();
-
-    for _ in 0..1_000_000_000 {
+    loop {
         if input.tmp > 35.0 || input.tmp < 20.0 {
             dt = -dt;
         }
@@ -65,12 +63,10 @@ pub extern "C" fn main(_nargs: i32, _args: *const *const u8) -> i32 {
         input.hmd += dh;
 
         frp.run(&input);
-        output = frp.sample().unwrap().clone();
-    }
+        let output = frp.sample().unwrap().clone();
 
-    unsafe {
-        printf(b"output: %d" as *const u8, output.fan as u32);
+        unsafe {
+            printf(b"%d\n" as *const u8, output.fan as u32);
+        }
     }
-
-    0
 }
