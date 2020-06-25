@@ -64,10 +64,7 @@ impl NotCalculatedError {
 impl Into<syn::Error> for NotCalculatedError {
     fn into(self) -> syn::Error {
         let token = &self.0;
-        let message = format!(
-            "output variable `{}` won't be calculated",
-            token.to_string()
-        );
+        let message = format!("output variable `{}` not calculated", token.to_string());
         syn::Error::new_spanned(token, message)
     }
 }
