@@ -4,7 +4,7 @@ frp! {
   mod Example;
 
   In { foo: i32 }
-  Out { bar : i32 }
+  Out { bar: i32 }
 
   let hoge = 1 + foo;
 }
